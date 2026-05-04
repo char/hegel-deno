@@ -53,21 +53,17 @@ describe("Labels", () => {
 // ---------------------------------------------------------------------------
 
 describe("assume", () => {
-  test(
-    "assume(true) is a no-op",
+  test("assume(true) is a no-op", () =>
     hegel.test((tc) => {
       tc.assume(true);
-    }),
-  );
+    }));
 
-  test(
-    "assume(false) rejects the test case",
+  test("assume(false) rejects the test case", () =>
     hegel.test((tc) => {
       const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
       tc.assume(x > 10);
       expect(x).toBeGreaterThan(10);
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -75,13 +71,11 @@ describe("assume", () => {
 // ---------------------------------------------------------------------------
 
 describe("note", () => {
-  test(
-    "note does not throw during exploration",
+  test("note does not throw during exploration", () =>
     hegel.test((tc) => {
       tc.draw(gs.booleans());
       tc.note("should not throw");
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -90,7 +84,7 @@ describe("note", () => {
 
 describe("failing test detection", () => {
   test("hegel.test() detects a property failure", () => {
-    expect(
+    expect(() =>
       hegel.test((tc) => {
         const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
         if (x > 0) {
@@ -101,7 +95,7 @@ describe("failing test detection", () => {
   });
 
   test("non-Error thrown value is reported", () => {
-    expect(
+    expect(() =>
       hegel.test((tc) => {
         tc.draw(gs.booleans());
         throw new Error("custom failure");
@@ -115,51 +109,81 @@ describe("failing test detection", () => {
 // ---------------------------------------------------------------------------
 
 describe("settings", () => {
-  test("Hegel builder with testCases setting", () => {
-    new hegel.Hegel((tc) => {
-      const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-      expect(x).toBeGreaterThanOrEqual(0);
-    })
-      .settings({ testCases: 10 })
-      .run();
-  });
-
-  test(
-    "hegel.test() with settings override",
+  test("hegel.test() with settings override", () =>
     hegel.test(
       (tc) => {
         const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
         expect(x).toBeGreaterThanOrEqual(0);
       },
       { testCases: 10 },
-    ),
-  );
+    ));
 });
 
 // ---------------------------------------------------------------------------
-// Hegel builder API
+// Async test bodies
 // ---------------------------------------------------------------------------
 
-describe("Hegel builder", () => {
-  test("passes a simple test with no assertions", () => {
-    new hegel.Hegel(() => {}).run();
+describe("async test bodies", () => {
+  test("hegel.testAsync() awaits an async test body", () =>
+    hegel.testAsync(
+      async (tc) => {
+        const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        // Yield to the event loop, then resume and assert.
+        await Promise.resolve();
+        expect(x).toBeGreaterThanOrEqual(0);
+      },
+      { testCases: 10 },
+    ));
+
+  test("async test body throwing fails the run", async () => {
+    await expect(
+      hegel.testAsync(
+        async (tc) => {
+          const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+          await Promise.resolve();
+          if (x > 0) {
+            throw new Error("async failure");
+          }
+        },
+        { testCases: 50 },
+      ),
+    ).rejects.toThrow("Property test failed");
   });
 
-  test("settings() is chainable", () => {
-    const h = new hegel.Hegel((tc) => {
-      tc.draw(gs.booleans());
-    });
-    const result = h.settings({ testCases: 5 });
-    expect(result).toBe(h);
-    h.run();
+  test("hegel.testAsync() awaits async bodies before resolving", async () => {
+    let observed = false;
+    await hegel.testAsync(
+      async (tc) => {
+        tc.draw(gs.booleans());
+        await Promise.resolve();
+        observed = true;
+      },
+      { testCases: 3 },
+    );
+    expect(observed).toBe(true);
   });
 
-  test("databaseKey() is chainable", () => {
-    const h = new hegel.Hegel((tc) => {
-      tc.draw(gs.booleans());
-    });
-    const result = h.databaseKey("test-key");
-    expect(result).toBe(h);
-    h.settings({ testCases: 5 }).run();
+  test("hegel.test() rejects async test bodies up front", () => {
+    expect(() =>
+      hegel.test((async (tc) => {
+        tc.draw(gs.booleans());
+      }) as (tc: hegel.TestCase) => void),
+    ).toThrow(/hegel\.testAsync/);
+  });
+
+  test("dropping the testAsync() promise does not throw synchronously", async () => {
+    let caughtSync: Error | null = null;
+    let promise!: Promise<void>;
+    try {
+      promise = hegel.testAsync(async (tc) => {
+        tc.draw(gs.integers());
+        await Promise.resolve();
+        throw new Error("boom");
+      });
+    } catch (e) {
+      caughtSync = e as Error;
+    }
+    expect(caughtSync).toBeNull();
+    await expect(promise).rejects.toThrow(/Property test failed/);
   });
 });

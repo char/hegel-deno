@@ -192,14 +192,12 @@ describe("makeNonBasic", () => {
     expect(nonBasic.asBasic()).toBeNull();
   });
 
-  it(
-    "generates values via the compositional path",
+  it("generates values via the compositional path", () =>
     hegel.test((tc) => {
       const gen = makeNonBasic(gs.integers({ minValue: 0, maxValue: 1000 }));
       const value = tc.draw(gen);
       expect(typeof value).toBe("number");
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(1000);
-    }),
-  );
+    }));
 });

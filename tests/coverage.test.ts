@@ -20,8 +20,7 @@ describe("collection protocol", () => {
   // sending a list schema to the server.
   const compositeInt = gs.composite((tc) => tc.draw(gs.integers({ minValue: 0, maxValue: 100 })));
 
-  test(
-    "arrays with composite elements uses collection protocol",
+  test("arrays with composite elements uses collection protocol", () =>
     hegel.test((tc) => {
       const arr = tc.draw(gs.arrays(compositeInt, { maxSize: 5 }));
       expect(Array.isArray(arr)).toBe(true);
@@ -30,45 +29,36 @@ describe("collection protocol", () => {
         expect(x).toBeGreaterThanOrEqual(0);
         expect(x).toBeLessThanOrEqual(100);
       }
-    }),
-  );
+    }));
 
-  test(
-    "arrays with composite elements respects minSize",
+  test("arrays with composite elements respects minSize", () =>
     hegel.test((tc) => {
       const arr = tc.draw(gs.arrays(compositeInt, { minSize: 1, maxSize: 5 }));
       expect(arr.length).toBeGreaterThanOrEqual(1);
       expect(arr.length).toBeLessThanOrEqual(5);
-    }),
-  );
+    }));
 
-  test(
-    "sets with composite elements uses collection protocol",
+  test("sets with composite elements uses collection protocol", () =>
     hegel.test((tc) => {
       const s = tc.draw(gs.sets(compositeInt, { maxSize: 5 }));
       expect(s).toBeInstanceOf(Set);
       expect(s.size).toBeLessThanOrEqual(5);
-    }),
-  );
+    }));
 
-  test(
-    "maps with composite keys uses collection protocol",
+  test("maps with composite keys uses collection protocol", () =>
     hegel.test((tc) => {
       const m = tc.draw(gs.maps(compositeInt, gs.booleans(), { maxSize: 3 }));
       expect(m).toBeInstanceOf(Map);
       expect(m.size).toBeLessThanOrEqual(3);
-    }),
-  );
+    }));
 
-  test(
-    "maps with composite values uses collection protocol",
+  test("maps with composite values uses collection protocol", () =>
     hegel.test((tc) => {
       const m = tc.draw(
         gs.maps(gs.integers({ minValue: 0, maxValue: 10 }), compositeInt, { maxSize: 3 }),
       );
       expect(m).toBeInstanceOf(Map);
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -76,8 +66,7 @@ describe("collection protocol", () => {
 // ---------------------------------------------------------------------------
 
 describe("unique arrays via collection protocol", () => {
-  test(
-    "unique arrays with composite elements reject duplicates",
+  test("unique arrays with composite elements reject duplicates", () =>
     hegel.test((tc) => {
       // Small range + composite = uses collection protocol + duplicate rejection
       const arr = tc.draw(
@@ -91,8 +80,7 @@ describe("unique arrays via collection protocol", () => {
       );
       const uniqueCount = new Set(arr).size;
       expect(uniqueCount).toBe(arr.length);
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -101,8 +89,7 @@ describe("unique arrays via collection protocol", () => {
 // ---------------------------------------------------------------------------
 
 describe("composite oneOf and optional", () => {
-  test(
-    "oneOf with composite generators uses span-based path",
+  test("oneOf with composite generators uses span-based path", () =>
     hegel.test((tc) => {
       const gen = gs.oneOf(
         compositeInt,
@@ -110,11 +97,9 @@ describe("composite oneOf and optional", () => {
       );
       const x = tc.draw(gen);
       expect(typeof x).toBe("number");
-    }),
-  );
+    }));
 
-  test(
-    "optional with composite generator uses span-based path",
+  test("optional with composite generator uses span-based path", () =>
     hegel.test((tc) => {
       const gen = gs.optional(compositeInt);
       const x = tc.draw(gen);
@@ -122,8 +107,7 @@ describe("composite oneOf and optional", () => {
         expect(x).toBeGreaterThanOrEqual(0);
         expect(x).toBeLessThanOrEqual(100);
       }
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -131,14 +115,12 @@ describe("composite oneOf and optional", () => {
 // ---------------------------------------------------------------------------
 
 describe("tuple composite path", () => {
-  test(
-    "tuples with composite elements uses span-based path",
+  test("tuples with composite elements uses span-based path", () =>
     hegel.test((tc) => {
       const [a, b] = tc.draw(gs.tuples(compositeInt, compositeInt));
       expect(typeof a).toBe("number");
       expect(typeof b).toBe("number");
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -146,17 +128,14 @@ describe("tuple composite path", () => {
 // ---------------------------------------------------------------------------
 
 describe("filter", () => {
-  test(
-    "filter passes values that match predicate",
+  test("filter passes values that match predicate", () =>
     hegel.test((tc) => {
       const even = gs.integers({ minValue: 0, maxValue: 1000 }).filter((x) => x % 2 === 0);
       const x = tc.draw(even);
       expect(x % 2).toBe(0);
-    }),
-  );
+    }));
 
-  test(
-    "filter with map preserves both transformations",
+  test("filter with map preserves both transformations", () =>
     hegel.test((tc) => {
       const gen = gs
         .integers({ minValue: 0, maxValue: 100 })
@@ -165,8 +144,7 @@ describe("filter", () => {
       const x = tc.draw(gen);
       expect(x).toBeGreaterThan(20);
       expect(x % 2).toBe(0);
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -174,14 +152,12 @@ describe("filter", () => {
 // ---------------------------------------------------------------------------
 
 describe("mapped generator paths", () => {
-  test(
-    "map on composite generator uses MAPPED span",
+  test("map on composite generator uses MAPPED span", () =>
     hegel.test((tc) => {
       const gen = compositeInt.map((x) => x * 2);
       const x = tc.draw(gen);
       expect(x % 2).toBe(0);
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -189,8 +165,7 @@ describe("mapped generator paths", () => {
 // ---------------------------------------------------------------------------
 
 describe("float edge cases", () => {
-  test(
-    "floats can generate NaN when allowed",
+  test("floats can generate NaN when allowed", () =>
     hegel.test(
       (tc) => {
         const x = tc.draw(gs.floats({ allowNan: true }));
@@ -198,24 +173,19 @@ describe("float edge cases", () => {
         expect(typeof x).toBe("number");
       },
       { testCases: 200 },
-    ),
-  );
+    ));
 
-  test(
-    "floats with min only",
+  test("floats with min only", () =>
     hegel.test((tc) => {
       const x = tc.draw(gs.floats({ minValue: 0, allowNan: false, allowInfinity: false }));
       expect(x).toBeGreaterThanOrEqual(0);
-    }),
-  );
+    }));
 
-  test(
-    "floats with max only",
+  test("floats with max only", () =>
     hegel.test((tc) => {
       const x = tc.draw(gs.floats({ maxValue: 100, allowNan: false, allowInfinity: false }));
       expect(x).toBeLessThanOrEqual(100);
-    }),
-  );
+    }));
 });
 
 // ---------------------------------------------------------------------------
@@ -224,16 +194,11 @@ describe("float edge cases", () => {
 // ---------------------------------------------------------------------------
 
 describe("HEGEL_PROTOCOL_TEST_MODE", () => {
-  test("stop_test_on_generate: resolves without error", () => {
+  async function withTestMode(mode: string, fn: () => Promise<void>) {
     const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
     try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = "stop_test_on_generate";
-      // This should complete without throwing - StopTest marks test case invalid
-      new hegel.Hegel((tc) => {
-        tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-      })
-        .settings({ testCases: 10 })
-        .run();
+      process.env["HEGEL_PROTOCOL_TEST_MODE"] = mode;
+      await fn();
     } finally {
       if (original === undefined) {
         delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
@@ -241,106 +206,77 @@ describe("HEGEL_PROTOCOL_TEST_MODE", () => {
         process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
       }
     }
-  });
+  }
 
-  test("error_response: resolves without throwing", () => {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = "error_response";
-      new hegel.Hegel((tc) => {
-        tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-      })
-        .settings({ testCases: 10 })
-        .run();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  });
+  test("stop_test_on_generate: resolves without error", () =>
+    // This should complete without throwing - StopTest marks test case invalid
+    withTestMode("stop_test_on_generate", () =>
+      hegel.test(
+        (tc) => {
+          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        },
+        { testCases: 10 },
+      ),
+    ));
 
-  test("empty_test: resolves without throwing", () => {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = "empty_test";
-      new hegel.Hegel((tc) => {
-        tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-      })
-        .settings({ testCases: 10 })
-        .run();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  });
+  test("error_response: resolves without throwing", () =>
+    withTestMode("error_response", () =>
+      hegel.test(
+        (tc) => {
+          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        },
+        { testCases: 10 },
+      ),
+    ));
 
-  test("stop_test_on_collection_more: resolves without throwing", () => {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = "stop_test_on_collection_more";
-      // Use composite generator to force collection protocol
-      new hegel.Hegel((tc) => {
-        const gen = gs.arrays(
-          gs.composite((inner) => inner.draw(gs.integers({ minValue: 0, maxValue: 100 }))),
-          { minSize: 1, maxSize: 10 },
-        );
-        tc.draw(gen);
-      })
-        .settings({ testCases: 10 })
-        .run();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  });
+  test("empty_test: resolves without throwing", () =>
+    withTestMode("empty_test", () =>
+      hegel.test(
+        (tc) => {
+          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        },
+        { testCases: 10 },
+      ),
+    ));
 
-  test("stop_test_on_new_collection: resolves without throwing", () => {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = "stop_test_on_new_collection";
-      new hegel.Hegel((tc) => {
-        const gen = gs.arrays(
-          gs.composite((inner) => inner.draw(gs.integers({ minValue: 0, maxValue: 100 }))),
-          { minSize: 1, maxSize: 10 },
-        );
-        tc.draw(gen);
-      })
-        .settings({ testCases: 10 })
-        .run();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  });
+  test("stop_test_on_collection_more: resolves without throwing", () =>
+    // Use composite generator to force collection protocol
+    withTestMode("stop_test_on_collection_more", () =>
+      hegel.test(
+        (tc) => {
+          const gen = gs.arrays(
+            gs.composite((inner) => inner.draw(gs.integers({ minValue: 0, maxValue: 100 }))),
+            { minSize: 1, maxSize: 10 },
+          );
+          tc.draw(gen);
+        },
+        { testCases: 10 },
+      ),
+    ));
 
-  test("stop_test_on_mark_complete: resolves without throwing", () => {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = "stop_test_on_mark_complete";
-      new hegel.Hegel((tc) => {
-        tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-      })
-        .settings({ testCases: 10 })
-        .run();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  });
+  test("stop_test_on_new_collection: resolves without throwing", () =>
+    withTestMode("stop_test_on_new_collection", () =>
+      hegel.test(
+        (tc) => {
+          const gen = gs.arrays(
+            gs.composite((inner) => inner.draw(gs.integers({ minValue: 0, maxValue: 100 }))),
+            { minSize: 1, maxSize: 10 },
+          );
+          tc.draw(gen);
+        },
+        { testCases: 10 },
+      ),
+    ));
+
+  test("stop_test_on_mark_complete: resolves without throwing", () =>
+    withTestMode("stop_test_on_mark_complete", () =>
+      hegel.test(
+        (tc) => {
+          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        },
+        { testCases: 10 },
+      ),
+    ));
 });
 
 // ---------------------------------------------------------------------------
@@ -348,12 +284,12 @@ describe("HEGEL_PROTOCOL_TEST_MODE", () => {
 // ---------------------------------------------------------------------------
 
 describe("shrinking", () => {
-  test("failing test shrinks to minimal example", () => {
+  test("failing test shrinks to minimal example", async () => {
     try {
-      hegel.test((tc) => {
+      await hegel.test((tc) => {
         const x = tc.draw(gs.integers({ minValue: 0, maxValue: 1000 }));
         if (x > 0) throw new Error("positive");
-      })();
+      });
     } catch (e) {
       // The error should report the shrunk example
       expect(e).toBeInstanceOf(Error);
@@ -361,14 +297,14 @@ describe("shrinking", () => {
     }
   });
 
-  test("list shrinking finds minimal list", () => {
+  test("list shrinking finds minimal list", async () => {
     try {
-      hegel.test((tc) => {
+      await hegel.test((tc) => {
         const arr = tc.draw(gs.arrays(gs.integers({ minValue: 0, maxValue: 100 })));
         if (arr.length > 0 && arr.some((x) => x > 0)) {
           throw new Error("found positive in list");
         }
-      })();
+      });
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
       expect((e as Error).message).toContain("Property test failed");
@@ -387,25 +323,20 @@ const compositeInt = gs.composite((tc) => tc.draw(gs.integers({ minValue: 0, max
 // ---------------------------------------------------------------------------
 
 describe("edge cases", () => {
-  test(
-    "empty array generation",
+  test("empty array generation", () =>
     hegel.test((tc) => {
       const arr = tc.draw(gs.arrays(gs.integers(), { maxSize: 0 }));
       expect(arr).toEqual([]);
-    }),
-  );
+    }));
 
-  test(
-    "sampledFrom with non-primitive values",
+  test("sampledFrom with non-primitive values", () =>
     hegel.test((tc) => {
       const options = [{ a: 1 }, { a: 2 }, { a: 3 }];
       const picked = tc.draw(gs.sampledFrom(options));
       expect(options).toContainEqual(picked);
-    }),
-  );
+    }));
 
-  test(
-    "deeply nested generation",
+  test("deeply nested generation", () =>
     hegel.test((tc) => {
       const gen = gs.arrays(gs.arrays(gs.integers({ minValue: 0, maxValue: 10 }), { maxSize: 3 }), {
         maxSize: 3,
@@ -419,11 +350,9 @@ describe("edge cases", () => {
           expect(x).toBeLessThanOrEqual(10);
         }
       }
-    }),
-  );
+    }));
 
-  test(
-    "flatMap dependent generation",
+  test("flatMap dependent generation", () =>
     hegel.test((tc) => {
       const gen = gs
         .integers({ minValue: 1, maxValue: 5 })
@@ -432,20 +361,16 @@ describe("edge cases", () => {
       const cpLen = [...s].length;
       expect(cpLen).toBeGreaterThanOrEqual(1);
       expect(cpLen).toBeLessThanOrEqual(5);
-    }),
-  );
+    }));
 
-  test(
-    "gs.just() returns the exact value",
+  test("gs.just() returns the exact value", () =>
     hegel.test((tc) => {
       const obj = { key: "value" };
       const x = tc.draw(gs.just(obj));
       expect(x).toBe(obj); // Same reference
-    }),
-  );
+    }));
 
-  test(
-    "assume(false) does not hang",
+  test("assume(false) does not hang", () =>
     hegel.test(
       (tc) => {
         tc.draw(gs.booleans());
@@ -454,13 +379,11 @@ describe("edge cases", () => {
         expect(true).toBe(false);
       },
       { testCases: 10 },
-    ),
-  );
+    ));
 });
 
 describe("asBasic composition", () => {
-  test(
-    "sets nested in tuples",
+  test("sets nested in tuples", () =>
     hegel.test((tc) => {
       const [s, n] = tc.draw(
         gs.tuples(
@@ -470,11 +393,9 @@ describe("asBasic composition", () => {
       );
       expect(s).toBeInstanceOf(Set);
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "maps nested in tuples",
+  test("maps nested in tuples", () =>
     hegel.test((tc) => {
       const [m, n] = tc.draw(
         gs.tuples(
@@ -486,11 +407,9 @@ describe("asBasic composition", () => {
       );
       expect(m).toBeInstanceOf(Map);
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "oneOf nested in tuples",
+  test("oneOf nested in tuples", () =>
     hegel.test((tc) => {
       const [v, n] = tc.draw(
         gs.tuples(
@@ -503,55 +422,45 @@ describe("asBasic composition", () => {
       );
       expect(Number.isInteger(v)).toBe(true);
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "optional nested in tuples",
+  test("optional nested in tuples", () =>
     hegel.test((tc) => {
       const [v, n] = tc.draw(
         gs.tuples(gs.optional(gs.integers({ minValue: 0, maxValue: 10 })), gs.integers()),
       );
       expect(v === null || Number.isInteger(v)).toBe(true);
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "tuples nested in tuples",
+  test("tuples nested in tuples", () =>
     hegel.test((tc) => {
       const [inner, n] = tc.draw(gs.tuples(gs.tuples(gs.integers(), gs.booleans()), gs.integers()));
       expect(Array.isArray(inner)).toBe(true);
       expect(Number.isInteger(inner[0])).toBe(true);
       expect(typeof inner[1]).toBe("boolean");
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "bigIntegers nested in tuples",
+  test("bigIntegers nested in tuples", () =>
     hegel.test((tc) => {
       const [big, n] = tc.draw(
         gs.tuples(gs.bigIntegers({ minValue: 0n, maxValue: 1000n }), gs.integers()),
       );
       expect(typeof big).toBe("bigint");
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "sampledFrom nested in tuples",
+  test("sampledFrom nested in tuples", () =>
     hegel.test((tc) => {
       const [color, n] = tc.draw(
         gs.tuples(gs.sampledFrom(["red", "green", "blue"]), gs.integers()),
       );
       expect(["red", "green", "blue"]).toContain(color);
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 
-  test(
-    "map on non-basic source returns null asBasic",
+  test("map on non-basic source returns null asBasic", () =>
     hegel.test((tc) => {
       // filter produces a non-basic generator (FilteredGenerator inherits the
       // base asBasic() that returns null). Mapping on top of it and then
@@ -565,6 +474,5 @@ describe("asBasic composition", () => {
       expect(Number.isInteger(v)).toBe(true);
       expect(v % 2).toBe(0);
       expect(Number.isInteger(n)).toBe(true);
-    }),
-  );
+    }));
 });

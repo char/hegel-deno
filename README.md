@@ -36,8 +36,7 @@ function mySort(ls: number[]): number[] {
   return [...new Set(result)];
 }
 
-test(
-  "my_sort matches builtin",
+test("my_sort matches builtin", () =>
   hegel.test((tc) => {
     const vec1 = tc.draw(gs.arrays(gs.integers()));
     const vec2 = mySort(vec1);
@@ -45,8 +44,7 @@ test(
     if (JSON.stringify(sorted) !== JSON.stringify(vec2)) {
       throw new Error(`sort mismatch: ${JSON.stringify(sorted)} != ${JSON.stringify(vec2)}`);
     }
-  }),
-);
+  }));
 ```
 
 This test will fail when run with `vitest`! Hegel will produce a minimal failing test case for us:
@@ -57,3 +55,22 @@ Error: sort mismatch: [0,0] != [0]
 ```
 
 Hegel reports the minimal example showing that our sort is incorrectly dropping duplicates. If we remove the `new Set(...)` deduplication from `mySort()`, this test will then pass (because it's just comparing the standard sort against itself).
+
+## Async tests
+
+For async tests, use `hegel.testAsync`:
+
+```typescript
+import { test } from "vitest";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
+
+test("fetch returns a value matching its input", () =>
+  hegel.testAsync(async (tc) => {
+    const id = tc.draw(gs.integers({ minValue: 1, maxValue: 1000 }));
+    const result = await fetchUser(id);
+    if (result.id !== id) {
+      throw new Error(`Expected id=${id}, got ${result.id}`);
+    }
+  }));
+```

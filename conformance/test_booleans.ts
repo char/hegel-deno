@@ -18,6 +18,5 @@ hegel.test(
     writeMetrics({ value });
   },
   { testCases },
-)();
-
+);
 process.exit(0);
