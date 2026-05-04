@@ -5,7 +5,7 @@ import * as gs from "@hegeldev/hegel/generators";
 
 for (const [name, value] of [
   ["hegel.test", hegel.test],
-  ["hegel.Hegel", hegel.Hegel],
+  ["hegel.testAsync", hegel.testAsync],
   ["gs.Generator", gs.Generator],
   ["gs.BasicGenerator", gs.BasicGenerator],
   ["gs.integers", gs.integers],

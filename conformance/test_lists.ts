@@ -41,6 +41,5 @@ hegel.test(
     });
   },
   { testCases },
-)();
-
+);
 process.exit(0);

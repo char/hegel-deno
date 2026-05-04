@@ -10,14 +10,13 @@
 export { TestCase, Collection, Labels, StopTestError, AssumeError } from "./testCase.js";
 export type { GeneratorLike, DataSource } from "./testCase.js";
 export {
-  Hegel,
   test,
+  testAsync,
   Verbosity,
   HealthCheck,
   Database,
   defaultSettings,
   ServerDataSource,
-  runTestCase,
 } from "./runner.js";
 export type { Settings, TestCaseResult, TestLocation } from "./runner.js";
 export type { Packet } from "./protocol.js";

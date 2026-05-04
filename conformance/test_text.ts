@@ -42,6 +42,5 @@ hegel.test(
     writeMetrics({ codepoints });
   },
   { testCases },
-)();
-
+);
 process.exit(0);

@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from "vitest";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
+import { runTestCase } from "../src/runner.js";
 
 // ---------------------------------------------------------------------------
 // FakeDataSource
@@ -322,96 +323,18 @@ describe("text and characters with alphabet", () => {
 });
 
 // ---------------------------------------------------------------------------
-// runner.ts: hegel.runTestCase
+// runner.ts: branch coverage for non-Error throws
+//
+// These two tests exercise paths that integration tests cannot reach: real
+// test code throws Error instances, but the runner's defensive paths handle
+// arbitrary thrown values. Direct calls with a fake DataSource are the only
+// way to cover the `String(e)` and `!(e instanceof Error)` branches.
 // ---------------------------------------------------------------------------
 
-describe("runTestCase with fake DataSource", () => {
-  it("returns valid for successful test", () => {
+describe("runTestCase with non-Error throws", () => {
+  it("extractOrigin returns null when a non-Error is thrown", () => {
     const ds = new FakeDataSource({ generates: [42] });
-    const result = hegel.runTestCase(
-      ds,
-      (tc) => {
-        tc.draw(gs.integers());
-      },
-      false,
-    );
-    expect(result.status).toBe("valid");
-    expect(ds.markCompleteCalls).toHaveLength(1);
-    expect(ds.markCompleteCalls[0].status).toBe("VALID");
-  });
-
-  it("returns invalid when assume(false) is thrown", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const result = hegel.runTestCase(
-      ds,
-      (tc) => {
-        tc.draw(gs.integers());
-        tc.assume(false);
-      },
-      false,
-    );
-    expect(result.status).toBe("invalid");
-    expect(ds.markCompleteCalls[0].status).toBe("INVALID");
-  });
-
-  it("returns invalid when hegel.StopTestError is thrown", () => {
-    const ds = new FakeDataSource({ generates: [] });
-    const result = hegel.runTestCase(
-      ds,
-      (tc) => {
-        tc.draw(gs.integers()); // will throw hegel.StopTestError
-      },
-      false,
-    );
-    expect(result.status).toBe("invalid");
-    expect(ds.markCompleteCalls[0].status).toBe("INVALID");
-  });
-
-  it("returns interesting when test throws an Error", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const result = hegel.runTestCase(
-      ds,
-      () => {
-        throw new Error("boom");
-      },
-      false,
-    );
-    expect(result.status).toBe("interesting");
-    expect(ds.markCompleteCalls[0].status).toBe("INTERESTING");
-  });
-
-  it("skips markComplete when testAborted is true", () => {
-    const ds = new FakeDataSource({ generates: [42], aborted: true });
-    const result = hegel.runTestCase(
-      ds,
-      (tc) => {
-        tc.draw(gs.integers());
-      },
-      false,
-    );
-    expect(result.status).toBe("valid");
-    expect(ds.markCompleteCalls).toHaveLength(0);
-  });
-
-  it("extractOrigin captures stack trace for interesting results", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const result = hegel.runTestCase(
-      ds,
-      () => {
-        throw new Error("test failure");
-      },
-      false,
-    );
-    expect(result.status).toBe("interesting");
-    // origin should be extracted from the stack trace
-    const call = ds.markCompleteCalls[0];
-    expect(call.status).toBe("INTERESTING");
-    expect(call.origin).toMatch(/^at /);
-  });
-
-  it("extractOrigin returns null for non-Error thrown", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const result = hegel.runTestCase(
+    const result = runTestCase(
       ds,
       () => {
         throw "string error";
@@ -422,25 +345,10 @@ describe("runTestCase with fake DataSource", () => {
     expect(ds.markCompleteCalls[0].origin).toBeNull();
   });
 
-  it("isFinal=true with interesting result writes to stderr", () => {
+  it("classifyResult uses String(e) when a non-Error is thrown in final replay", () => {
     const ds = new FakeDataSource({ generates: [42] });
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = hegel.runTestCase(
-      ds,
-      () => {
-        throw new Error("final failure");
-      },
-      true,
-    );
-    expect(result.status).toBe("interesting");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("final failure"));
-    spy.mockRestore();
-  });
-
-  it("isFinal=true with non-Error interesting result writes to stderr", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = hegel.runTestCase(
+    const result = runTestCase(
       ds,
       () => {
         throw "string thrown";
@@ -449,38 +357,6 @@ describe("runTestCase with fake DataSource", () => {
     );
     expect(result.status).toBe("interesting");
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("string thrown"));
-    spy.mockRestore();
-  });
-
-  it("isFinal=true writes stack trace for Error", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    hegel.runTestCase(
-      ds,
-      () => {
-        throw new Error("with stack");
-      },
-      true,
-    );
-    // Should have at least two writes: message and stack
-    const calls = spy.mock.calls.map((c) => String(c[0]));
-    expect(calls.some((c) => c.includes("with stack"))).toBe(true);
-    expect(calls.some((c) => c.includes("at "))).toBe(true);
-    spy.mockRestore();
-  });
-
-  it("isFinal=true with valid result still logs draws", () => {
-    const ds = new FakeDataSource({ generates: [99] });
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = hegel.runTestCase(
-      ds,
-      (tc) => {
-        tc.draw(gs.integers());
-      },
-      true,
-    );
-    expect(result.status).toBe("valid");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("draw_1"));
     spy.mockRestore();
   });
 });
@@ -678,10 +554,6 @@ describe("Generator.asBasic", () => {
   it("composite generator asBasic returns null", () => {
     const gen = gs.composite((tc) => tc.draw(gs.integers()));
     expect(gen.asBasic()).toBeNull();
-  });
-
-  it("basic-backed generator asBasic returns a BasicGenerator", () => {
-    expect(gs.integers().asBasic()).toBeInstanceOf(gs.BasicGenerator);
   });
 
   it("BasicGenerator.asBasic() returns itself", () => {
