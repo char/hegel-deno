@@ -4,13 +4,13 @@
  * @packageDocumentation
  */
 
-import { TestCase, Labels, generateRaw, type GeneratorLike } from "../testCase.js";
+import { TestCase, Labels, generateRaw } from "../testCase.js";
 
 /**
  * Base class for all generators. Generators produce values of type T
  * synchronously by communicating with the hegel server.
  */
-export abstract class Generator<T> implements GeneratorLike<T> {
+export abstract class Generator<T> {
   /** @internal */
   abstract doDraw(tc: TestCase): T;
 

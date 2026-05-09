@@ -1,9 +1,9 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["src/index.ts", "src/generators/index.ts"],
+  "entryPoints": ["src/index.ts"],
   "out": "docs",
   "treatWarningsAsErrors": true,
   "disableSources": true,
-  "readme": "README.md",
+  "readme": "none",
   "excludeInternal": true
 }
