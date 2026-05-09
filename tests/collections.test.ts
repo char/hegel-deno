@@ -14,7 +14,7 @@ import { describe, test, expect } from "vitest";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 
-// hegel.Collection protocol tests use fewer test cases because each test case
+// Collection protocol tests use fewer test cases because each test case
 // involves many server round-trips (one per collection element).
 const FEW = { testCases: 20 };
 

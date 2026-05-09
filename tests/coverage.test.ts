@@ -1,7 +1,7 @@
 /**
  * Tests targeting uncovered code paths, ported from hegel-rust test patterns.
  *
- * Covers: hegel.Collection protocol, composite generator fallbacks, StopTest
+ * Covers: Collection protocol, composite generator fallbacks, StopTest
  * handling via HEGEL_PROTOCOL_TEST_MODE, filter exhaustion, and error paths.
  */
 
@@ -10,13 +10,13 @@ import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 
 // ---------------------------------------------------------------------------
-// hegel.Collection protocol via composite generators
-// (When elements don't have asBasic(), arrays/sets/maps use hegel.Collection)
+// Collection protocol via composite generators
+// (When elements don't have asBasic(), arrays/sets/maps use Collection)
 // ---------------------------------------------------------------------------
 
 describe("collection protocol", () => {
   // A composite generator has no schema, so gs.arrays() must use the
-  // hegel.Collection protocol (new_collection / collection_more) instead of
+  // Collection protocol (new_collection / collection_more) instead of
   // sending a list schema to the server.
   const compositeInt = gs.composite((tc) => tc.draw(gs.integers({ minValue: 0, maxValue: 100 })));
 

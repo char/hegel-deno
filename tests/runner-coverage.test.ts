@@ -1,7 +1,7 @@
 /**
  * Tests targeting uncovered lines in runner.ts, specifically:
  * - Hegel.run() settings branches (database, suppressHealthCheck)
- * - hegel.ServerDataSource error handling paths
+ * - ServerDataSource error handling paths
  * - Health check failure detection
  * - Flaky test detection
  * - Server error (invalid schema) detection
@@ -10,13 +10,14 @@
 import { describe, test, expect } from "vitest";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
+import { defaultSettings } from "../src/runner.js";
 
 describe("defaultSettings CI detection", () => {
   test("defaultSettings returns database='disabled' when CI env var is set", () => {
     const original = process.env["CI"];
     try {
       process.env["CI"] = "true";
-      const settings = hegel.defaultSettings();
+      const settings = defaultSettings();
       expect(settings.database).toEqual(hegel.Database.disabled);
       expect(settings.derandomize).toBe(true);
     } finally {
@@ -51,7 +52,7 @@ describe("defaultSettings CI detection", () => {
     try {
       // Set GITHUB_ACTIONS which expects value "true"
       process.env["GITHUB_ACTIONS"] = "true";
-      const settings = hegel.defaultSettings();
+      const settings = defaultSettings();
       expect(settings.database).toEqual(hegel.Database.disabled);
       expect(settings.derandomize).toBe(true);
     } finally {
@@ -89,7 +90,7 @@ describe("defaultSettings CI detection", () => {
       delete process.env[key];
     }
     try {
-      const settings = hegel.defaultSettings();
+      const settings = defaultSettings();
       expect(settings.database).toEqual(hegel.Database.unset);
       expect(settings.derandomize).toBe(false);
     } finally {
@@ -144,7 +145,7 @@ describe("settings branches", () => {
 describe("server error detection", () => {
   test("invalid schema triggers server error", () => {
     // Send a schema the server rejects (integer with min > max).
-    // This exercises the generic server error path in hegel.ServerDataSource.sendRequest.
+    // This exercises the generic server error path in ServerDataSource.sendRequest.
     const badGen = new gs.BasicGenerator({ type: "integer", min_value: 100, max_value: 0 });
     expect(() =>
       hegel.test(

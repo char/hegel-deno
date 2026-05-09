@@ -8,6 +8,8 @@
  */
 
 import { inspect } from "node:util";
+// Type-only import to avoid a runtime cycle: Generator depends on TestCase.
+import type { Generator } from "./generators/core.js";
 
 export class StopTestError extends Error {
   constructor() {
@@ -45,10 +47,6 @@ export const Labels = {
   ENUM_VARIANT: 15,
 } as const;
 
-export interface GeneratorLike<T> {
-  doDraw(tc: TestCase): T;
-}
-
 /**
  * Abstraction over the data backend for a test case.
  *
@@ -84,10 +82,12 @@ export class TestCase {
     return this._dataSource;
   }
 
+  /** @internal */
   get isLastRun(): boolean {
     return this._isLastRun;
   }
 
+  /** @internal */
   get testAborted(): boolean {
     return this._dataSource.testAborted();
   }
@@ -95,7 +95,7 @@ export class TestCase {
   /**
    * Draw a value from a generator.
    */
-  draw<T>(generator: GeneratorLike<T>): T {
+  draw<T>(generator: Generator<T>): T {
     const value = generator.doDraw(this);
     if (this.spanDepth === 0) {
       this.drawCount++;
@@ -104,14 +104,6 @@ export class TestCase {
       }
     }
     return value;
-  }
-
-  /**
-   * Draw a value from a generator without recording it in the output.
-   * Unlike draw(), this does not print the value during the final replay.
-   */
-  drawSilent<T>(generator: GeneratorLike<T>): T {
-    return generator.doDraw(this);
   }
 
   /**
@@ -134,6 +126,7 @@ export class TestCase {
 
   /**
    * Start a shrinking span with the given label.
+   * @internal
    */
   startSpan(label: number): void {
     this.spanDepth++;
@@ -147,6 +140,7 @@ export class TestCase {
 
   /**
    * Stop the current shrinking span.
+   * @internal
    */
   stopSpan(discard = false): void {
     this.spanDepth--;

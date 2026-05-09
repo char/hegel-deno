@@ -1,19 +1,26 @@
 /**
- * Tests using fake hegel.DataSource implementations to exercise code paths in
+ * Tests using fake DataSource implementations to exercise code paths in
  * testCase.ts, generators.ts, and runner.ts that are unreachable through
  * the real hegel server.
  */
 
 import { describe, it, expect, vi } from "vitest";
-import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
+import {
+  AssumeError,
+  Collection,
+  Labels,
+  StopTestError,
+  TestCase,
+  type DataSource,
+} from "../src/testCase.js";
 import { runTestCase } from "../src/runner.js";
 
 // ---------------------------------------------------------------------------
 // FakeDataSource
 // ---------------------------------------------------------------------------
 
-class FakeDataSource implements hegel.DataSource {
+class FakeDataSource implements DataSource {
   private generates: unknown[];
   private generateIndex = 0;
   private _throwOnStartSpan: boolean;
@@ -45,7 +52,7 @@ class FakeDataSource implements hegel.DataSource {
   generate(schema: Record<string, unknown>): unknown {
     void schema;
     if (this.generateIndex >= this.generates.length) {
-      throw new hegel.StopTestError();
+      throw new StopTestError();
     }
     return this.generates[this.generateIndex++];
   }
@@ -97,33 +104,33 @@ class FakeDataSource implements hegel.DataSource {
 describe("TestCase with fake DataSource", () => {
   it("isLastRun getter returns true when constructed with isLastRun=true", () => {
     const ds = new FakeDataSource({ generates: [42] });
-    const tc = new hegel.TestCase(ds, true);
+    const tc = new TestCase(ds, true);
     expect(tc.isLastRun).toBe(true);
   });
 
   it("isLastRun getter returns false when constructed with isLastRun=false", () => {
     const ds = new FakeDataSource({ generates: [42] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(tc.isLastRun).toBe(false);
   });
 
   it("stopSpan catches errors from dataSource.stopSpan", () => {
     const ds = new FakeDataSource({ generates: [42], throwOnStopSpan: true });
-    const tc = new hegel.TestCase(ds, false);
-    tc.startSpan(hegel.Labels.LIST);
+    const tc = new TestCase(ds, false);
+    tc.startSpan(Labels.LIST);
     // stopSpan should NOT throw even though dataSource.stopSpan throws
     expect(() => tc.stopSpan()).not.toThrow();
   });
 
   it("startSpan catches and re-throws errors from dataSource.startSpan", () => {
     const ds = new FakeDataSource({ generates: [42], throwOnStartSpan: true });
-    const tc = new hegel.TestCase(ds, false);
-    expect(() => tc.startSpan(hegel.Labels.LIST)).toThrow("startSpan error");
+    const tc = new TestCase(ds, false);
+    expect(() => tc.startSpan(Labels.LIST)).toThrow("startSpan error");
   });
 
   it("draw logs to stderr on isLastRun=true at spanDepth=0", () => {
     const ds = new FakeDataSource({ generates: [42] });
-    const tc = new hegel.TestCase(ds, true);
+    const tc = new TestCase(ds, true);
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     tc.draw(gs.integers());
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("draw_1"));
@@ -132,7 +139,7 @@ describe("TestCase with fake DataSource", () => {
 
   it("note writes to stderr on isLastRun=true", () => {
     const ds = new FakeDataSource({ generates: [] });
-    const tc = new hegel.TestCase(ds, true);
+    const tc = new TestCase(ds, true);
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     tc.note("hello");
     expect(spy).toHaveBeenCalledWith("hello");
@@ -141,7 +148,7 @@ describe("TestCase with fake DataSource", () => {
 
   it("note does nothing on isLastRun=false", () => {
     const ds = new FakeDataSource({ generates: [] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     tc.note("hello");
     expect(spy).not.toHaveBeenCalled();
@@ -150,32 +157,32 @@ describe("TestCase with fake DataSource", () => {
 
   it("testAborted returns dataSource.testAborted()", () => {
     const ds = new FakeDataSource({ aborted: true });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(tc.testAborted).toBe(true);
   });
 
   it("assume(false) throws AssumeError", () => {
     const ds = new FakeDataSource();
-    const tc = new hegel.TestCase(ds, false);
-    expect(() => tc.assume(false)).toThrow(hegel.AssumeError);
+    const tc = new TestCase(ds, false);
+    expect(() => tc.assume(false)).toThrow(AssumeError);
   });
 
   it("assume(true) does not throw", () => {
     const ds = new FakeDataSource();
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.assume(true)).not.toThrow();
   });
 });
 
 // ---------------------------------------------------------------------------
-// hegel.Collection
+// Collection
 // ---------------------------------------------------------------------------
 
 describe("Collection with fake DataSource", () => {
   it("reject when finished is a no-op", () => {
     const ds = new FakeDataSource({ collectionCounts: 0 });
-    const tc = new hegel.TestCase(ds, false);
-    const col = new hegel.Collection(tc, 0);
+    const tc = new TestCase(ds, false);
+    const col = new Collection(tc, 0);
     expect(col.more()).toBe(false);
     // reject after finished should not throw
     col.reject("should be no-op");
@@ -183,16 +190,16 @@ describe("Collection with fake DataSource", () => {
 
   it("more when already finished returns false", () => {
     const ds = new FakeDataSource({ collectionCounts: 0 });
-    const tc = new hegel.TestCase(ds, false);
-    const col = new hegel.Collection(tc, 0);
+    const tc = new TestCase(ds, false);
+    const col = new Collection(tc, 0);
     expect(col.more()).toBe(false);
     expect(col.more()).toBe(false);
   });
 
   it("collection with elements", () => {
     const ds = new FakeDataSource({ collectionCounts: 2, generates: [10, 20] });
-    const tc = new hegel.TestCase(ds, false);
-    const col = new hegel.Collection(tc, 0);
+    const tc = new TestCase(ds, false);
+    const col = new Collection(tc, 0);
     expect(col.more()).toBe(true);
     expect(col.more()).toBe(true);
     expect(col.more()).toBe(false);
@@ -202,11 +209,11 @@ describe("Collection with fake DataSource", () => {
     const ds = new FakeDataSource({ collectionCounts: 1 });
     // Override collectionMore to throw
     ds.collectionMore = () => {
-      throw new hegel.StopTestError();
+      throw new StopTestError();
     };
-    const tc = new hegel.TestCase(ds, false);
-    const col = new hegel.Collection(tc, 0);
-    expect(() => col.more()).toThrow(hegel.StopTestError);
+    const tc = new TestCase(ds, false);
+    const col = new Collection(tc, 0);
+    expect(() => col.more()).toThrow(StopTestError);
     // After error, more() returns false without calling dataSource again
     expect(col.more()).toBe(false);
   });
@@ -219,7 +226,7 @@ describe("Collection with fake DataSource", () => {
 describe("MappedGenerator with fake DataSource", () => {
   it("map on BasicGenerator uses optimized asBasic() path", () => {
     const ds = new FakeDataSource({ generates: [5] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.integers().map((x) => x * 2);
     // This exercises MappedGenerator.doDraw -> asBasic() returns non-null
     expect(tc.draw(gen)).toBe(10);
@@ -227,7 +234,7 @@ describe("MappedGenerator with fake DataSource", () => {
 
   it("map on composite returns null from asBasic()", () => {
     const ds = new FakeDataSource({ generates: [7] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.composite((inner) => inner.draw(gs.integers())).map((x) => x + 1);
     // MappedGenerator.asBasic() returns null, uses span-based path
     expect(tc.draw(gen)).toBe(8);
@@ -241,31 +248,31 @@ describe("MappedGenerator with fake DataSource", () => {
 describe("Generator parse error paths", () => {
   it("binary parseBytes throws on non-bytes", () => {
     const ds = new FakeDataSource({ generates: ["not bytes"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.binary())).toThrow("Expected bytes");
   });
 
   it("arrays parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.arrays(gs.integers()))).toThrow("Expected array");
   });
 
   it("sets parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.sets(gs.integers()))).toThrow("Expected array");
   });
 
   it("maps parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.maps(gs.integers(), gs.integers()))).toThrow("Expected array");
   });
 
   it("maps parse throws on invalid entry", () => {
     const ds = new FakeDataSource({ generates: [["not a pair"]] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.maps(gs.integers(), gs.integers()))).toThrow(
       "Expected [key, value] pair",
     );
@@ -273,19 +280,19 @@ describe("Generator parse error paths", () => {
 
   it("oneOf parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.oneOf(gs.integers(), gs.booleans()))).toThrow("Expected array");
   });
 
   it("optional parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.optional(gs.integers()))).toThrow("Expected array");
   });
 
   it("tuples parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     expect(() => tc.draw(gs.tuples(gs.integers(), gs.integers()))).toThrow("Expected array");
   });
 });
@@ -309,14 +316,14 @@ describe("text and characters with alphabet", () => {
 
   it("text generator parses result as string", () => {
     const ds = new FakeDataSource({ generates: [42] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.text());
     expect(result).toBe("42");
   });
 
   it("characters generator parses result as string", () => {
     const ds = new FakeDataSource({ generates: ["a"] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.characters());
     expect(result).toBe("a");
   });
@@ -382,14 +389,14 @@ describe("optional parse paths", () => {
 
   it("optional returns null when index is 0", () => {
     const ds = new FakeDataSource({ generates: [[0, null]] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.optional(gs.integers()));
     expect(result).toBeNull();
   });
 
   it("optional returns value when index is 1", () => {
     const ds = new FakeDataSource({ generates: [[1, 42]] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.optional(gs.integers()));
     expect(result).toBe(42);
   });
@@ -416,7 +423,7 @@ describe("oneOf parse paths", () => {
 
   it("oneOf dispatches by index from [index, value] response", () => {
     const ds = new FakeDataSource({ generates: [[1, true]] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.oneOf(gs.integers(), gs.booleans()));
     expect(result).toBe(true);
   });
@@ -424,11 +431,11 @@ describe("oneOf parse paths", () => {
   it("oneOf routes the value to the matching branch's parseRaw", () => {
     // Branches with different shapes: a string-typed branch and an integer-typed branch.
     const ds0 = new FakeDataSource({ generates: [[0, "abc"]] });
-    const tc0 = new hegel.TestCase(ds0, false);
+    const tc0 = new TestCase(ds0, false);
     expect(tc0.draw(gs.oneOf<string | number>(gs.text(), gs.integers()))).toBe("abc");
 
     const ds1 = new FakeDataSource({ generates: [[1, 42]] });
-    const tc1 = new hegel.TestCase(ds1, false);
+    const tc1 = new TestCase(ds1, false);
     expect(tc1.draw(gs.oneOf<string | number>(gs.text(), gs.integers()))).toBe(42);
   });
 
@@ -437,11 +444,11 @@ describe("oneOf parse paths", () => {
     const branch0 = gs.integers({ minValue: 0, maxValue: 9 }).map((x) => x * 10);
     const branch1 = gs.integers({ minValue: 0, maxValue: 9 }).map((x) => x + 100);
     const ds = new FakeDataSource({ generates: [[0, 7]] });
-    const tc0 = new hegel.TestCase(ds, false);
+    const tc0 = new TestCase(ds, false);
     expect(tc0.draw(gs.oneOf(branch0, branch1))).toBe(70);
 
     const ds2 = new FakeDataSource({ generates: [[1, 7]] });
-    const tc1 = new hegel.TestCase(ds2, false);
+    const tc1 = new TestCase(ds2, false);
     expect(tc1.draw(gs.oneOf(branch0, branch1))).toBe(107);
   });
 });
@@ -454,7 +461,7 @@ describe("binary parse paths", () => {
   it("parseBytes handles Buffer input", () => {
     const buf = Buffer.from([1, 2, 3]);
     const ds = new FakeDataSource({ generates: [buf] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.binary());
     expect(result).toBeInstanceOf(Uint8Array);
     // Buffer extends Uint8Array, so instanceof check returns raw Buffer
@@ -464,7 +471,7 @@ describe("binary parse paths", () => {
   it("parseBytes handles Uint8Array input", () => {
     const arr = new Uint8Array([4, 5, 6]);
     const ds = new FakeDataSource({ generates: [arr] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const result = tc.draw(gs.binary());
     expect(result).toBe(arr);
   });
@@ -503,16 +510,16 @@ describe("Generator validation errors", () => {
 describe("FilteredGenerator with fake DataSource", () => {
   it("filter retries and returns when predicate passes", () => {
     const ds = new FakeDataSource({ generates: [1, 2, 10] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.integers().filter((x) => x >= 10);
     expect(tc.draw(gen)).toBe(10);
   });
 
-  it("filter throws hegel.AssumeError after 3 failures", () => {
+  it("filter throws AssumeError after 3 failures", () => {
     const ds = new FakeDataSource({ generates: [1, 2, 3] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.integers().filter((x) => x > 100);
-    expect(() => tc.draw(gen)).toThrow(hegel.AssumeError);
+    expect(() => tc.draw(gen)).toThrow(AssumeError);
   });
 });
 
@@ -524,7 +531,7 @@ describe("FlatMappedGenerator with fake DataSource", () => {
   it("flatMap draws from source then from derived generator", () => {
     // First generate returns the source value, second returns the derived value
     const ds = new FakeDataSource({ generates: [3, 42] });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.integers().flatMap((_n) => gs.integers());
     expect(tc.draw(gen)).toBe(42);
   });
@@ -572,7 +579,7 @@ describe("Collection protocol via fake DataSource", () => {
       generates: [10, 20],
       collectionCounts: 2,
     });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.arrays(
       gs.composite((inner) => inner.draw(gs.integers())),
       { maxSize: 5 },
@@ -586,7 +593,7 @@ describe("Collection protocol via fake DataSource", () => {
       generates: [10, 20],
       collectionCounts: 2,
     });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.sets(
       gs.composite((inner) => inner.draw(gs.integers())),
       { maxSize: 5 },
@@ -600,7 +607,7 @@ describe("Collection protocol via fake DataSource", () => {
       generates: [1, 10, 2, 20],
       collectionCounts: 2,
     });
-    const tc = new hegel.TestCase(ds, false);
+    const tc = new TestCase(ds, false);
     const gen = gs.maps(
       gs.composite((inner) => inner.draw(gs.integers())),
       gs.composite((inner) => inner.draw(gs.integers())),
@@ -613,19 +620,6 @@ describe("Collection protocol via fake DataSource", () => {
         [2, 20],
       ]),
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// drawSilent
-// ---------------------------------------------------------------------------
-
-describe("drawSilent", () => {
-  it("draws a value without recording output", () => {
-    const ds = new FakeDataSource({ generates: [42] });
-    const tc = new hegel.TestCase(ds, false);
-    const value = tc.drawSilent(gs.integers());
-    expect(value).toBe(42);
   });
 });
 

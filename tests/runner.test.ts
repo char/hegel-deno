@@ -5,10 +5,11 @@
 import { describe, test, it, expect } from "vitest";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
+import { AssumeError, Labels, StopTestError, TestCase } from "../src/testCase.js";
 
 describe("StopTestError", () => {
   it("has correct name and message", () => {
-    const e = new hegel.StopTestError();
+    const e = new StopTestError();
     expect(e.name).toBe("StopTestError");
     expect(e).toBeInstanceOf(Error);
     expect(e.message).toBe("Server ran out of data (StopTest)");
@@ -17,7 +18,7 @@ describe("StopTestError", () => {
 
 describe("AssumeError", () => {
   it("has correct name and message", () => {
-    const e = new hegel.AssumeError();
+    const e = new AssumeError();
     expect(e.name).toBe("AssumeError");
     expect(e).toBeInstanceOf(Error);
     expect(e.message).toBe("Assumption rejected");
@@ -25,26 +26,26 @@ describe("AssumeError", () => {
 });
 
 // ---------------------------------------------------------------------------
-// hegel.Labels constants
+// Labels constants
 // ---------------------------------------------------------------------------
 
 describe("Labels", () => {
   it("has correct values", () => {
-    expect(hegel.Labels.LIST).toBe(1);
-    expect(hegel.Labels.LIST_ELEMENT).toBe(2);
-    expect(hegel.Labels.SET).toBe(3);
-    expect(hegel.Labels.SET_ELEMENT).toBe(4);
-    expect(hegel.Labels.MAP).toBe(5);
-    expect(hegel.Labels.MAP_ENTRY).toBe(6);
-    expect(hegel.Labels.TUPLE).toBe(7);
-    expect(hegel.Labels.ONE_OF).toBe(8);
-    expect(hegel.Labels.OPTIONAL).toBe(9);
-    expect(hegel.Labels.FIXED_DICT).toBe(10);
-    expect(hegel.Labels.FLAT_MAP).toBe(11);
-    expect(hegel.Labels.FILTER).toBe(12);
-    expect(hegel.Labels.MAPPED).toBe(13);
-    expect(hegel.Labels.SAMPLED_FROM).toBe(14);
-    expect(hegel.Labels.ENUM_VARIANT).toBe(15);
+    expect(Labels.LIST).toBe(1);
+    expect(Labels.LIST_ELEMENT).toBe(2);
+    expect(Labels.SET).toBe(3);
+    expect(Labels.SET_ELEMENT).toBe(4);
+    expect(Labels.MAP).toBe(5);
+    expect(Labels.MAP_ENTRY).toBe(6);
+    expect(Labels.TUPLE).toBe(7);
+    expect(Labels.ONE_OF).toBe(8);
+    expect(Labels.OPTIONAL).toBe(9);
+    expect(Labels.FIXED_DICT).toBe(10);
+    expect(Labels.FLAT_MAP).toBe(11);
+    expect(Labels.FILTER).toBe(12);
+    expect(Labels.MAPPED).toBe(13);
+    expect(Labels.SAMPLED_FROM).toBe(14);
+    expect(Labels.ENUM_VARIANT).toBe(15);
   });
 });
 
@@ -167,7 +168,7 @@ describe("async test bodies", () => {
     expect(() =>
       hegel.test((async (tc) => {
         tc.draw(gs.booleans());
-      }) as (tc: hegel.TestCase) => void),
+      }) as (tc: TestCase) => void),
     ).toThrow(/hegel\.testAsync/);
   });
 
