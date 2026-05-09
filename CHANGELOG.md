@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.1 - 2026-05-09
+
+This release makes `generators` reachable as a namespace from `@hegeldev/hegel`:
+
+```typescript
+// A
+import * as hegel from "@hegeldev/hegel";
+hegel.generators.integers()
+
+// B, still works as before:
+import * as gs from "@hegeldev/hegel/generators";
+gs.integers()
+```
+
+We still recommend option B.
+
+This release also removes a number of private APIs from the public exports of `@hegeldev/hegel`.
+
 ## 0.2.0 - 2026-05-04
 
 This release changes `hegel.test` to execute immediately when called, instead of returning a callable which must be called to run the property-based test.
