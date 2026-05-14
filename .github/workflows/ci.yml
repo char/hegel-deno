@@ -35,7 +35,7 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Install zizmor
-        run: pip install zizmor
+        run: pip install zizmor==1.23.1
       - name: Run zizmor
         run: zizmor --format plain .github/
 
@@ -163,7 +163,7 @@ jobs:
 
       - name: Generate app token
         if: steps.check.outputs.skip != 'true'
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1 # zizmor: ignore[github-app]
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         id: app-token
         with:
           app-id: ${{ vars.HEGEL_RELEASE_APP_ID }}
@@ -224,7 +224,7 @@ jobs:
       contents: read
     steps:
       - name: Generate app token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1 # zizmor: ignore[github-app]
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         id: app-token
         with:
           app-id: ${{ vars.HEGEL_RELEASE_APP_ID }}
