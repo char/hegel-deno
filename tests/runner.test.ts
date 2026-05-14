@@ -192,7 +192,7 @@ describe("async test bodies", () => {
 test("handles throwing weird types", () => {
   expect(() =>
     hegel.test((tc) => {
-      let n = tc.draw(gs.integers());
+      const n = tc.draw(gs.integers());
       if (n >= 12345) {
         throw n;
       }
