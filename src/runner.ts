@@ -395,6 +395,7 @@ export class Hegel {
       seed: this._settings.seed,
       stream_id: testStream.streamId,
       derandomize: this._settings.derandomize,
+      database_key: Buffer.from(this.testFn.toString()),
     };
 
     if (this._settings.database.kind === "disabled") {
