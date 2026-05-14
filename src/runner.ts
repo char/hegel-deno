@@ -204,8 +204,8 @@ export type TestCaseResult =
   | { status: "invalid" }
   | { status: "interesting"; error: unknown };
 
-function extractOrigin(error: unknown): string | null {
-  if (!(error instanceof Error) || !error.stack) return null;
+function extractOrigin(error: unknown): string {
+  if (!(error instanceof Error) || !error.stack) return "<unknown>";
   const lines = error.stack.split("\n");
   for (const line of lines) {
     const trimmed = line.trim();
@@ -214,7 +214,7 @@ function extractOrigin(error: unknown): string | null {
     }
   }
   /* v8 ignore start: all stack traces in practice have at least one non-node_modules frame */
-  return null;
+  return "<unknown>";
   /* v8 ignore stop */
 }
 
@@ -395,6 +395,7 @@ export class Hegel {
       seed: this._settings.seed,
       stream_id: testStream.streamId,
       derandomize: this._settings.derandomize,
+      database_key: Buffer.from(this.testFn.toString()),
     };
 
     if (this._settings.database.kind === "disabled") {

@@ -339,7 +339,7 @@ describe("text and characters with alphabet", () => {
 // ---------------------------------------------------------------------------
 
 describe("runTestCase with non-Error throws", () => {
-  it("extractOrigin returns null when a non-Error is thrown", () => {
+  it("extractOrigin returns '<unknown>' when a non-Error is thrown", () => {
     const ds = new FakeDataSource({ generates: [42] });
     const result = runTestCase(
       ds,
@@ -349,7 +349,7 @@ describe("runTestCase with non-Error throws", () => {
       false,
     );
     expect(result.status).toBe("interesting");
-    expect(ds.markCompleteCalls[0].origin).toBeNull();
+    expect(ds.markCompleteCalls[0].origin).toBe("<unknown>");
   });
 
   it("classifyResult uses String(e) when a non-Error is thrown in final replay", () => {

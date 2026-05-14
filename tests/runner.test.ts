@@ -188,3 +188,14 @@ describe("async test bodies", () => {
     await expect(promise).rejects.toThrow(/Property test failed/);
   });
 });
+
+test("handles throwing weird types", () => {
+  expect(() =>
+    hegel.test((tc) => {
+      const n = tc.draw(gs.integers());
+      if (n >= 12345) {
+        throw n;
+      }
+    }),
+  ).toThrow("Property test failed: 12345");
+});
