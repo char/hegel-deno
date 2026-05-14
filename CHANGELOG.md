@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 - 2026-05-14
+
+We now automatically derive a database key based on the source code of the function. This allows Hegel to automatically replay previous failures. See https://github.com/hegeldev/hegel-typescript/issues/36.
+
 ## 0.2.1 - 2026-05-09
 
 This release makes `generators` reachable as a namespace from `@hegeldev/hegel`:
