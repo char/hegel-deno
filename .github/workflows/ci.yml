@@ -163,7 +163,7 @@ jobs:
 
       - name: Generate app token
         if: steps.check.outputs.skip != 'true'
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1 # zizmor: ignore[github-app]
         id: app-token
         with:
           app-id: ${{ vars.HEGEL_RELEASE_APP_ID }}
@@ -224,7 +224,7 @@ jobs:
       contents: read
     steps:
       - name: Generate app token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1 # zizmor: ignore[github-app]
         id: app-token
         with:
           app-id: ${{ vars.HEGEL_RELEASE_APP_ID }}
