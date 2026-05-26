@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 - 2026-05-26
+
+This patch bumps our pinned hegel-core from [0.6.0](https://github.com/hegeldev/hegel-core/releases/tag/v0.6.0) to [0.9.1](https://github.com/hegeldev/hegel-core/releases/tag/v0.9.1).
+
 ## 0.2.2 - 2026-05-14
 
 We now automatically derive a database key based on the source code of the function. This allows Hegel to automatically replay previous failures. See https://github.com/hegeldev/hegel-typescript/issues/36.
