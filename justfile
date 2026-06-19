@@ -5,7 +5,7 @@ set ignore-comments := true
 fetch-libhegel:
     #!/usr/bin/env bash
     set -euo pipefail
-    version=0.20.1
+    version="$(sed -n 's/^export const LIBHEGEL_VERSION = "\([^"]*\)";/\1/p' src/checksums.ts)"
     case "$(uname -s)" in
       Linux) os=linux; ext=so;;
       Darwin) os=darwin; ext=dylib;;
@@ -32,6 +32,13 @@ build-libhegel:
     set -euo pipefail
     cargo build --release -p hegeltest-c --manifest-path ../hegel-rust/Cargo.toml
     echo "../hegel-rust/target/release/libhegel_c.so"
+
+# Regenerate src/checksums.ts from a hegel-rust release. Targets the latest
+# release; pass a version (e.g. `just update-checksums 0.20.1`) to pin an exact
+# one.
+update-checksums version="":
+    node scripts/update-checksums.mjs {{version}}
+    npx prettier --write src/checksums.ts
 
 check-test:
     #!/usr/bin/env bash
