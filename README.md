@@ -18,9 +18,15 @@ To install: `npm install --save-dev @hegeldev/hegel`.
 
 Hegel requires Node 16+. Bun and Deno are not currently supported.
 
-Hegel will use [uv](https://docs.astral.sh/uv/) to install the required [hegel-core](https://github.com/hegeldev/hegel-core) server component.
-If `uv` is already on your path, it will use that, otherwise it will download a private copy of it to ~/.cache/hegel and not put it on your path.
-See https://hegel.dev/reference/installation for details.
+Hegel drives [libhegel](https://github.com/hegeldev/hegel-rust) — the native Rust
+engine — directly via FFI. On first use it downloads the matching `libhegel`
+shared library for your platform from the hegel-rust GitHub releases (SHA-256
+verified) and caches it under `~/.cache/hegel-typescript/`. Set
+`HEGEL_LIBHEGEL_PATH` to point at a local build to skip the download, or
+`HEGEL_LIBHEGEL_NO_DOWNLOAD=1` to opt out of the download fallback.
+
+Supported platforms (those with a published libhegel artifact): Linux
+amd64/arm64, macOS arm64 (Apple Silicon), and Windows amd64/arm64.
 
 ## Quickstart
 

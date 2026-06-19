@@ -31,7 +31,10 @@ class IntegersGenerator extends Generator<number> {
         "integers() bounds must be within Number.MIN_SAFE_INTEGER..Number.MAX_SAFE_INTEGER. Use bigIntegers() for larger ranges.",
       );
     }
-    this.schema = { type: "integer", min_value: min, max_value: max };
+    // Encode bounds as BigInt so they always serialize as CBOR integers: the
+    // native engine strictly rejects float-encoded integer bounds, and cbor-x
+    // encodes plain JS numbers above 2**32 as CBOR floats.
+    this.schema = { type: "integer", min_value: BigInt(min), max_value: BigInt(max) };
   }
 
   doDraw(tc: TestCase): number {
@@ -62,6 +65,10 @@ function parseBigInt(raw: unknown): bigint {
   return BigInt(raw as number);
 }
 
+// Default bounds for an unbounded bigIntegers() side (signed 128-bit range).
+const DEFAULT_BIGINT_MIN = -(2n ** 127n);
+const DEFAULT_BIGINT_MAX = 2n ** 127n - 1n;
+
 class BigIntegersGenerator extends Generator<bigint> {
   private readonly schema: Record<string, unknown>;
 
@@ -72,10 +79,15 @@ class BigIntegersGenerator extends Generator<bigint> {
     if (min !== undefined && max !== undefined && min > max) {
       throw new Error("Cannot have maxValue < minValue");
     }
-    const schema: Record<string, unknown> = { type: "integer" };
-    if (min !== undefined) schema["min_value"] = min;
-    if (max !== undefined) schema["max_value"] = max;
-    this.schema = schema;
+    // The native engine requires explicit integer bounds. For an unbounded
+    // side, default to the signed 128-bit range: the engine's draw is
+    // bit-width-weighted (favoring small magnitudes), so a wide finite range
+    // reproduces Hypothesis's unbounded-integer distribution closely.
+    this.schema = {
+      type: "integer",
+      min_value: min ?? DEFAULT_BIGINT_MIN,
+      max_value: max ?? DEFAULT_BIGINT_MAX,
+    };
   }
 
   doDraw(tc: TestCase): bigint {

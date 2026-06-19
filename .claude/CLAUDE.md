@@ -11,70 +11,77 @@ just docs    # Build API documentation
 just check   # Run lint + docs + test (full CI check)
 ```
 
-The `hegel` server is auto-installed on first use via `uv tool run` (see
-`src/uv.ts`). Set `HEGEL_SERVER_COMMAND` to point at a pre-built `hegel`
-binary to skip that lookup.
+The native `libhegel` shared library is auto-downloaded (per platform, SHA-256
+verified) on first use and cached under `~/.cache/hegel-typescript/` (see
+`src/locate.ts`). Set `HEGEL_LIBHEGEL_PATH` to point at a local build to skip
+the download; `HEGEL_LIBHEGEL_NO_DOWNLOAD=1` opts out of the download fallback.
+`just fetch-libhegel` downloads the host artifact into `.hegel/` for offline
+test runs; `just build-libhegel` builds it from a sibling `../hegel-rust`.
 
 ## What This Is
 
 A TypeScript implementation of the Hegel property-based testing library. Hegel is a
 universal property-based testing protocol powered by Hypothesis on the backend.
-Client libraries communicate with the `hegel` binary (a Python server) via Unix sockets using
-a custom binary protocol.
+This client drives **libhegel** — the native Rust engine (`hegel-rust/hegel-c`,
+version 0.20.1) — directly through its C ABI via the `koffi` FFI library. There
+is no subprocess and no wire protocol: the engine runs on a worker thread inside
+libhegel, and the client calls C functions synchronously.
 
 ## Architecture
 
 The library is structured in layers, each building on the previous:
 
-1. **Protocol Layer** — Binary wire protocol with 20-byte header, CBOR payload, CRC32
-2. **Connection & Streams** — Unix socket multiplexing with demand-driven reader
-3. **Test Runner** — Spawns `hegel` subprocess, manages test lifecycle
-4. **Generators** — Type-safe generator abstraction, span system, collection protocol
-5. **Derivation** — Type-directed generator derivation via decorators, record schemas, and variant generators
-6. **Conformance** — Test binaries that validate library correctness against the framework
+1. **Library loading** (`src/locate.ts`, `src/checksums.ts`) — resolve / download
+   / verify the native `libhegel` shared library for the host platform.
+2. **FFI binding** (`src/libhegel.ts`) — `koffi` bindings to the libhegel C ABI,
+   wrapped in a typed `Libhegel` class. `int`-returning fallible calls map to
+   thrown errors (`StopTestError` for `HEGEL_E_STOP_TEST`, `AssumeError` for
+   `HEGEL_E_ASSUME`, otherwise `LibhegelError`).
+3. **Session** (`src/session.ts`) — a process-global, lazily-loaded `Libhegel`
+   handle with a `major.minor` version compatibility check.
+4. **Test Runner** (`src/runner.ts`) — drives the `run_start` → `next_test_case`
+   → `mark_complete` loop, mapping `Settings` onto the C setters and surfacing a
+   failed/errored run as a thrown error. `NativeDataSource` implements the
+   `DataSource` interface against a libhegel test case.
+5. **Generators** (`src/generators/`) — type-safe generator abstraction, span
+   system, collection protocol. Transport-agnostic: they build CBOR schemas and
+   draw through the `DataSource` interface.
 
-### Key Pattern: Demand-Driven Reader
+### Key Pattern: Synchronous FFI
 
-The Connection uses a demand-driven model: when a Stream needs a message, it
-acquires a reader lock and reads packets from the socket until its inbox has data.
-No background threads — reading is triggered by the consumer that needs data.
+All libhegel calls are synchronous (blocking) — `hegel.test` is a synchronous
+function. `hegel.testAsync` awaits the user's async body between the
+(synchronous) draws. `hegel_next_test_case` blocks until the engine's worker
+thread produces the next case.
 
-### Key Pattern: Thread-Local Stream State
+### Key Pattern: CBOR value codec (`src/cbor.ts`)
 
-The current data stream is stored in thread-local (or context-var) state so that
-generator functions (`generate()`, `assume()`, `note()`, `target()`) don't need a
-stream parameter. The test runner sets the current stream before calling the test
-body.
+libhegel returns generated strings (and the string-shaped format generators) as
+a CBOR **tag 91** wrapping WTF-8 bytes (preserving lone surrogates). `src/cbor.ts`
+registers the tag-91 cbor-x extension and is the single CBOR entry point;
+integer schema bounds must be CBOR integers (encode them as `bigint`), since the
+engine strictly rejects float-encoded integers.
 
-### Key Pattern: Global Lazy Session
+### Key Pattern: Global Lazy Handle
 
-The `hegel` subprocess is managed by a global session that starts lazily on first
-use and shuts down automatically on process exit. Users never construct connections
-or sessions manually — `run_hegel_test()` is a plain free function.
+The native library is loaded by a global session that initializes lazily on
+first use and stays loaded for the process lifetime. Users never construct it —
+`hegel.test()` / `hegel.testAsync()` are plain free functions. Per-run
+`Context`/`Settings`/`Run` handles are created and freed (in `finally`) by the
+runner; test cases from `next_test_case` are borrowed and freed by `run_free`.
 
 ## Testing Philosophy
 
 - **100% code coverage** is mandatory. `just check` fails if any line is uncovered.
-  Use `HEGEL_PROTOCOL_TEST_MODE` (see below) to cover error paths — do NOT use `# nocov`.
-- **Use the real `hegel` binary** for integration tests. Never write a mock server.
-  The real binary runs as a subprocess, so there is zero threading contention.
-  In-process mocks with threads cause deadlocks — they have wasted hundreds of
-  agent turns in previous library generations.
-- **Socket pairs** (`socketpair()`) for unit testing Connection/Stream in isolation.
-
-### HEGEL_PROTOCOL_TEST_MODE — Error Injection
-
-Set the `HEGEL_PROTOCOL_TEST_MODE` environment variable before calling `run_hegel_test` to
-trigger server-side error injection:
-
-| Mode                           | What it does                              |
-| ------------------------------ | ----------------------------------------- |
-| `stop_test_on_generate`        | StopTest on 1st generate of 2nd test case |
-| `stop_test_on_mark_complete`   | StopTest in response to mark_complete     |
-| `stop_test_on_collection_more` | StopTest during collection_more           |
-| `stop_test_on_new_collection`  | StopTest during new_collection            |
-| `error_response`               | RequestError on first generate            |
-| `empty_test`                   | test_done immediately, no test cases run  |
+  Drive real error paths against the real library (malformed schema, caller
+  misuse) and use injected fake `Bindings` for the few NULL-return / result-code
+  branches the engine can't easily be driven into — do NOT use `# nocov`.
+- **Use the real `libhegel` library** for integration tests. Never write a mock
+  engine. The engine runs on its own worker thread inside libhegel.
+- A note on in-test downloads: `spawnSync` blocks the event loop, so a download
+  test must not point the child at an in-process HTTP server (deadlock). Test the
+  inline downloader via async `spawn`, and the resolution logic via injected
+  spawn results.
 
 ## Composing generators
 
@@ -84,44 +91,55 @@ mapping field names to generators). Both live in `src/generators/compose.ts`
 and are re-exported from `@hegeldev/hegel/generators`. They support `.map()`,
 `.filter()`, and `.flatMap()` like any other generator.
 
-## Critical: StopTest Handling
+## Critical: StopTest / Assume Handling
 
-When the server sends StopTest, the client MUST:
+`hegel_generate` (and the other per-test-case primitives) return result codes
+that `Libhegel.check` maps to exceptions:
 
-1. Raise a language-specific exception (DataExhausted/StopTest) to unwind the test body
-2. NOT send `mark_complete` after receiving StopTest
-3. Track a per-test-case `test_aborted` flag to suppress further commands
+1. `HEGEL_E_STOP_TEST` → `StopTestError` (choice budget exhausted). Unwind the
+   body and `mark_complete` with `OVERRUN`.
+2. `HEGEL_E_ASSUME` → `AssumeError` (the engine rejected the draw, e.g. an email
+   precondition failed). Unwind and `mark_complete` with `INVALID`.
+3. Any other non-OK code → `LibhegelError` carrying `hegel_context_last_error`.
 
-Failing to handle StopTest correctly causes `FlakyStrategyDefinition` errors.
+`mark_complete` is always called exactly once per test case (no `test_aborted`
+suppression — that was a wire-protocol concern).
 
-## Wire Protocol
+## libhegel C ABI
 
-- **Header**: 5 big-endian uint32: `magic(0x4845474C)`, `CRC32`, `stream_id`,
-  `message_id`, `payload_length`
-- **Payload**: CBOR-encoded bytes
-- **Terminator**: single byte `0x0A`
-- **Reply bit**: `message_id | (1 << 31)` marks a message as a reply
-- **Client stream IDs**: odd — allocated as `(counter << 1) | 1`
-- **CRC32**: computed over the full 20-byte header (checksum field zeroed) + payload
+The native engine is driven through the C functions declared in
+`hegel-rust/hegel-c/include/hegel.h` (version 0.20.1, the context-based ABI).
+Every fallible call takes a `hegel_context_t*` first argument and reports
+diagnostics via `hegel_context_last_error(ctx)`. Lifecycle:
+`hegel_run_start` → loop `hegel_next_test_case` (NULL = done) → per-case
+primitives → `hegel_mark_complete` → `hegel_run_result`. See `src/libhegel.ts`
+for the bound surface; the schema dicts the generators build are CBOR-encoded
+and passed to `hegel_generate`.
 
 ## Tooling Choices
 
 | Tool           | Package                        | Version         | Purpose                                                |
 | -------------- | ------------------------------ | --------------- | ------------------------------------------------------ |
 | TypeScript     | `typescript`                   | 5.9.3           | Type checking (`tsc --noEmit`), declaration generation |
+| FFI            | `koffi`                        | 3.0.2           | Loading and calling the native libhegel C ABI          |
+| CBOR           | `cbor-x`                       | 1.6.x           | Encoding schemas / decoding generated values           |
 | Test Framework | `vitest`                       | 4.0.18          | Test runner, native TypeScript/ESM support             |
 | Coverage       | `@vitest/coverage-v8`          | 4.0.18          | V8-based code coverage, enforces 100% thresholds       |
 | Linter         | `eslint` + `typescript-eslint` | 10.0.2 / 8.56.1 | Type-aware linting with ESLint v10 flat config         |
 | Formatter      | `prettier`                     | 3.8.1           | Code formatting                                        |
 | Documentation  | `typedoc`                      | 0.28.17         | API docs from TSDoc comments                           |
-| Runtime        | Node.js                        | 16.x            | LTS runtime                                            |
+| Runtime        | Node.js                        | 16.x            | LTS runtime (koffi ships prebuilt binaries for 16+)    |
 
 ### Build Commands Detail
 
-- `just test` — `npx vitest run --coverage` then `python3 scripts/check-coverage.py`
+- `just test` — `just fetch-libhegel` (download the host artifact into `.hegel/`
+  and export `HEGEL_LIBHEGEL_PATH`), then `npx vitest run --coverage` and
+  `python3 scripts/check-coverage.py`
 - `just lint` — `npx prettier --check . && npx eslint . && npx tsc --noEmit`
 - `just format` — `npx prettier --write .`
 - `just docs` — `npx typedoc` (with `treatWarningsAsErrors: true`)
+- `just fetch-libhegel` / `just build-libhegel` — obtain the native library
+  (download the release, or build from a sibling `../hegel-rust`)
 
 ## Project Conventions
 
@@ -130,13 +148,14 @@ Failing to handle StopTest correctly causes `FlakyStrategyDefinition` errors.
 ```
 src/                 — Library source code (all production code)
   index.ts           — Public API entry point
-  protocol.ts        — Binary wire protocol (header, CBOR, CRC32)
-  connection.ts      — Unix socket connection and stream multiplexing
-  crc32.ts           — CRC32 helper
-  wtf8.ts            — WTF-8 string handling
-  runner.ts          — Test runner (`hegel.test`, Settings, AsyncLocalStorage context, error classes)
-  session.ts         — Global lazy session (HegelSession, server subprocess lifecycle)
-  testCase.ts        — TestCase, Collection, Labels, StopTestError, AssumeError
+  locate.ts          — Locate / download / verify the native libhegel library
+  checksums.ts       — Pinned libhegel version + per-platform SHA-256 checksums
+  libhegel.ts        — koffi bindings to the libhegel C ABI + typed `Libhegel` wrapper
+  cbor.ts            — CBOR codec with the tag-91 (WTF-8 string) extension
+  wtf8.ts            — WTF-8 decoder (lone-surrogate-preserving)
+  session.ts         — Global lazy libhegel handle + version check
+  runner.ts          — Test runner (`hegel.test`/`testAsync`, Settings, NativeDataSource)
+  testCase.ts        — TestCase, Collection, Labels, DataSource, StopTestError, AssumeError
   generators/        — Generator implementations
     index.ts         — Re-exports the public generator surface
     core.ts          — Generator/BasicGenerator base classes
@@ -146,17 +165,12 @@ src/                 — Library source code (all production code)
     combinators.ts   — just, sampledFrom, oneOf, optional
     compose.ts       — composite, record
     tuples.ts        — tuples
-  uv.ts              — Auto-install of uv + hegel-core server
-  uv-install.sh      — Bundled uv installer script
 tests/               — Test files (excluded from coverage)
   *.test.ts          — Vitest test files (one per module)
-  showcase.test.ts   — Property tests demonstrating real library usage
-  conformance/       — Python-side conformance test runner
-conformance/         — TypeScript conformance test scripts (run as binaries via tsx)
-  helpers.ts         — Shared helpers (getTestCases, writeMetrics, makeNonBasic)
-  test_*.ts          — Individual conformance scenarios
+  libPath.ts         — Resolves the libhegel path for tests (env or .hegel/)
 scripts/             — Build/CI scripts
   check-coverage.py  — Secondary coverage validation script
+.hegel/              — Downloaded libhegel artifact for offline tests (gitignored)
 README.md            — Project overview and quick start
 dist/                — Compiled output (gitignored)
 docs/                — Generated TypeDoc output (gitignored)
@@ -185,6 +199,42 @@ coverage/            — Coverage reports (gitignored)
 - `typedoc.json` — TypeDoc documentation options
 
 ## Lessons Learned
+
+### Native backend (libhegel via koffi)
+
+- **Integer schema bounds must be CBOR integers.** cbor-x encodes plain JS
+  numbers above 2³² as CBOR floats, which the engine's integer schema strictly
+  rejects (`expected CBOR integer, got Float(...)`). Encode integer bounds as
+  `bigint` (see `integers()`/`bigIntegers()` in `numeric.ts`). The float schema
+  accepts integer-encoded bounds, so only the integer side needs this.
+- **The engine has no unbounded integer.** `interpret_integer` requires both
+  `min_value` and `max_value`. `bigIntegers()` with an open side defaults to the
+  signed 128-bit range — the engine's bit-width-weighted draw makes a wide finite
+  range behave like Hypothesis's unbounded distribution.
+- **Generated strings come back as CBOR tag 91 wrapping WTF-8 bytes** (not a CBOR
+  text string), so lone surrogates survive. `src/cbor.ts` registers the tag-91
+  cbor-x extension → `wtf8ToString`; decode all values through it. This covers
+  `string` and every string-shaped format generator (email/url/domain/date/…).
+- **`hegel_generate` can return `HEGEL_E_ASSUME` (-2)**, not just `STOP_TEST`,
+  when the engine rejects a draw internally (e.g. an email that exceeds length).
+  Map it to `AssumeError` (discard the case), not a hard error.
+- **koffi out-pointers**: declare `_Out_ void** out` / `_Out_ size_t* out_len`
+  and pass single-element JS arrays (`[null]`, `[0]`); read the returned bytes
+  with `Buffer.from(koffi.decode(out[0], "uint8_t", len))`. koffi does not free
+  anything — free `Context`/`Settings`/`Run` explicitly in `finally`.
+- **koffi types** are named exports, not properties of the default import:
+  `import koffi, { type LibraryHandle } from "koffi"`. The FFI call boundary is
+  inherently `any`; re-impose static types via a `Bindings` interface.
+- **`spawnSync` + an in-process HTTP server deadlocks** — `spawnSync` blocks the
+  event loop so the server never answers the child. The synchronous first-run
+  downloader (`ensureLibrarySync`) runs a child `node` for exactly this reason;
+  test the inline downloader program with async `spawn`, and the surrounding
+  logic with injected `spawn` results.
+- **`hegel.test` is synchronous**, so library resolution must be synchronous.
+  The override (`HEGEL_LIBHEGEL_PATH`) and cache-hit paths are pure fs; only the
+  one-time download shells out to a child process.
+
+### General
 
 - Vitest v4 with `@vitest/coverage-v8` provides built-in coverage thresholds that
   fail the test run if any metric drops below 100% — no external script needed for

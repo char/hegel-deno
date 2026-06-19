@@ -13,7 +13,7 @@ import type { Generator } from "./generators/core.js";
 
 export class StopTestError extends Error {
   constructor() {
-    super("Server ran out of data (StopTest)");
+    super("Hegel ran out of data (StopTest)");
     this.name = "StopTestError";
   }
 }
@@ -50,9 +50,12 @@ export const Labels = {
 /**
  * Abstraction over the data backend for a test case.
  *
- * The default implementation (ServerDataSource) talks to the hegel server
- * over a multiplexed stream. Custom implementations can be used in tests
- * to inject specific behaviors without a server.
+ * The default implementation (NativeDataSource) drives the native libhegel
+ * test case via its C ABI. Custom implementations can be used in tests to
+ * inject specific behaviors without the engine.
+ *
+ * `status` passed to {@link DataSource.markComplete} is a `hegel_status_t`
+ * value (see {@link Status} in `libhegel.ts`).
  */
 export interface DataSource {
   generate(schema: Record<string, unknown>): unknown;
@@ -61,8 +64,7 @@ export interface DataSource {
   newCollection(minSize: number, maxSize?: number): number;
   collectionMore(collectionId: number): boolean;
   collectionReject(collectionId: number, why?: string): void;
-  markComplete(status: string, origin: string | null): void;
-  testAborted(): boolean;
+  markComplete(status: number, origin: string | null): void;
 }
 
 export class TestCase {
@@ -85,11 +87,6 @@ export class TestCase {
   /** @internal */
   get isLastRun(): boolean {
     return this._isLastRun;
-  }
-
-  /** @internal */
-  get testAborted(): boolean {
-    return this._dataSource.testAborted();
   }
 
   /**

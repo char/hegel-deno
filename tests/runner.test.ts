@@ -12,7 +12,7 @@ describe("StopTestError", () => {
     const e = new StopTestError();
     expect(e.name).toBe("StopTestError");
     expect(e).toBeInstanceOf(Error);
-    expect(e.message).toBe("Server ran out of data (StopTest)");
+    expect(e.message).toBe("Hegel ran out of data (StopTest)");
   });
 });
 

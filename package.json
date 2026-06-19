@@ -27,7 +27,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && cp src/uv-install.sh dist/uv-install.sh",
+    "build": "tsc",
     "test": "vitest run --coverage",
     "lint": "prettier --check . && eslint . && tsc --noEmit",
     "format": "prettier --write .",
@@ -49,14 +49,14 @@
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "prettier": "^3.8.1",
-    "tsx": "^4.19.3",
     "typedoc": "^0.28.17",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "cbor-x": "^1.6.0"
+    "cbor-x": "^1.6.0",
+    "koffi": "^3.0.2"
   },
   "//overrides": "fix vitest peerOptional declaring @types/node >=20, which is incompatible with us",
   "overrides": {
