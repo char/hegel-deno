@@ -60,8 +60,8 @@ jobs:
       - name: Run tests
         run: just check-test
 
-  test-node-16:
-    name: test (node 16)
+  test-node-20:
+    name: test (node 20)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,7 +75,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "16"
+          node-version: "20"
 
       - run: npm ci
       - run: npm run build
@@ -87,7 +87,7 @@ jobs:
         working-directory: tests/old_node
         run: npm install --no-audit --no-fund
 
-      - name: Run old-Node tests
+      - name: Run minimum-Node smoke tests
         working-directory: tests/old_node
         run: |
           for f in *.mjs; do
@@ -116,7 +116,7 @@ jobs:
   release:
     name: release
     if: github.event_name == 'push' && github.repository == 'hegeldev/hegel-typescript'
-    needs: [lint, test, test-node-16, docs]
+    needs: [lint, test, test-node-20, docs]
     runs-on: ubuntu-latest
     permissions:
       contents: write

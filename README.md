@@ -16,7 +16,7 @@ Hegel is a property-based testing library for TypeScript. Hegel is based on [Hyp
 
 To install: `npm install --save-dev @hegeldev/hegel`.
 
-Hegel requires Node 16+. Bun and Deno are not currently supported.
+Hegel requires Node 20.11+. Bun and Deno are not currently supported.
 
 Hegel drives [libhegel](https://github.com/hegeldev/hegel-rust) — the native Rust
 engine — directly via FFI. On first use it downloads the matching `libhegel`

@@ -16,7 +16,7 @@
  * npm install --save-dev @hegeldev/hegel
  * ```
  *
- * Hegel requires Node 16+. Bun and Deno are not currently supported.
+ * Hegel requires Node 20.11+. Bun and Deno are not currently supported.
  *
  * ## Write your first test
  *

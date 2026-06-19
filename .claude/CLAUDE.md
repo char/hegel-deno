@@ -118,17 +118,17 @@ and passed to `hegel_generate`.
 
 ## Tooling Choices
 
-| Tool           | Package                        | Version         | Purpose                                                |
-| -------------- | ------------------------------ | --------------- | ------------------------------------------------------ |
-| TypeScript     | `typescript`                   | 5.9.3           | Type checking (`tsc --noEmit`), declaration generation |
-| FFI            | `koffi`                        | 3.0.2           | Loading and calling the native libhegel C ABI          |
-| CBOR           | `cbor-x`                       | 1.6.x           | Encoding schemas / decoding generated values           |
-| Test Framework | `vitest`                       | 4.0.18          | Test runner, native TypeScript/ESM support             |
-| Coverage       | `@vitest/coverage-v8`          | 4.0.18          | V8-based code coverage, enforces 100% thresholds       |
-| Linter         | `eslint` + `typescript-eslint` | 10.0.2 / 8.56.1 | Type-aware linting with ESLint v10 flat config         |
-| Formatter      | `prettier`                     | 3.8.1           | Code formatting                                        |
-| Documentation  | `typedoc`                      | 0.28.17         | API docs from TSDoc comments                           |
-| Runtime        | Node.js                        | 16.x            | LTS runtime (koffi ships prebuilt binaries for 16+)    |
+| Tool           | Package                        | Version         | Purpose                                                 |
+| -------------- | ------------------------------ | --------------- | ------------------------------------------------------- |
+| TypeScript     | `typescript`                   | 5.9.3           | Type checking (`tsc --noEmit`), declaration generation  |
+| FFI            | `koffi`                        | 3.0.2           | Loading and calling the native libhegel C ABI           |
+| CBOR           | `cbor-x`                       | 1.6.x           | Encoding schemas / decoding generated values            |
+| Test Framework | `vitest`                       | 4.0.18          | Test runner, native TypeScript/ESM support              |
+| Coverage       | `@vitest/coverage-v8`          | 4.0.18          | V8-based code coverage, enforces 100% thresholds        |
+| Linter         | `eslint` + `typescript-eslint` | 10.0.2 / 8.56.1 | Type-aware linting with ESLint v10 flat config          |
+| Formatter      | `prettier`                     | 3.8.1           | Code formatting                                         |
+| Documentation  | `typedoc`                      | 0.28.17         | API docs from TSDoc comments                            |
+| Runtime        | Node.js                        | 20.11+          | koffi 3.x's loader needs `import.meta.dirname` (≥20.11) |
 
 ### Build Commands Detail
 

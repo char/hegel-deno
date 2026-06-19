@@ -41,11 +41,11 @@
   "author": "David R. MacIver <david.maciver@antithesis.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^16.18.0",
+    "@types/node": "^20.11.0",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "prettier": "^3.8.1",
@@ -57,9 +57,5 @@
   "dependencies": {
     "cbor-x": "^1.6.0",
     "koffi": "^3.0.2"
-  },
-  "//overrides": "fix vitest peerOptional declaring @types/node >=20, which is incompatible with us",
-  "overrides": {
-    "@types/node": "$@types/node"
   }
 }
