@@ -33,10 +33,24 @@ function fakeBindings(overrides: Partial<Bindings>): Bindings {
     settingsDatabase: noop,
     settingsDatabaseKey: noop,
     settingsSuppressHealthCheck: noop,
-    runStart: () => ({}) as Ptr,
-    nextTestCase: () => null,
-    runResult: () => ({}) as Ptr,
+    runStart: (_ctx, _settings, out) => {
+      out[0] = {} as Ptr;
+      return 0;
+    },
+    nextTestCase: (_ctx, _run, out) => {
+      out[0] = null;
+      return 0;
+    },
+    runResult: (_ctx, _run, out) => {
+      out[0] = {} as Ptr;
+      return 0;
+    },
     runFree: noop,
+    testCaseFromBlob: (_ctx, _s, _blob, out) => {
+      out[0] = {} as Ptr;
+      return 0;
+    },
+    testCaseFree: noop,
     generate: () => 0,
     startSpan: () => 0,
     stopSpan: () => 0,
@@ -44,13 +58,12 @@ function fakeBindings(overrides: Partial<Bindings>): Bindings {
     collectionMore: () => 0,
     collectionReject: () => 0,
     markComplete: () => 0,
-    isFinalReplay: () => false,
     runResultStatus: () => RunStatus.PASSED,
     runResultError: () => null,
     runResultFailureCount: () => 0,
     runResultFailure: () => null,
-    failurePanicMessage: () => null,
     failureOrigin: () => null,
+    failureReproductionBlob: () => null,
     version: () => "0.0.0",
     ...overrides,
   };
@@ -58,38 +71,83 @@ function fakeBindings(overrides: Partial<Bindings>): Bindings {
 }
 
 describe("Libhegel wrapper logic (fake bindings)", () => {
-  it("throws when run_start returns NULL", () => {
+  it("throws when run_start returns an error code", () => {
     const lib = new Libhegel(
-      fakeBindings({ runStart: () => null, contextLastError: () => "boom" }),
+      fakeBindings({
+        runStart: (_ctx, _settings, out) => {
+          out[0] = null;
+          return -3;
+        },
+        contextLastError: () => "boom",
+      }),
     );
     expect(() => lib.runStart(null, null)).toThrow(/hegel_run_start failed: boom/);
   });
 
-  it("nextTestCase returns null at normal completion (no error set)", () => {
+  it("nextTestCase returns null at normal completion (OK code, NULL out)", () => {
     const lib = new Libhegel(
-      fakeBindings({ nextTestCase: () => null, contextLastError: () => "" }),
+      fakeBindings({
+        nextTestCase: (_ctx, _run, out) => {
+          out[0] = null;
+          return 0;
+        },
+      }),
     );
     expect(lib.nextTestCase(null, null)).toBeNull();
   });
 
-  it("nextTestCase throws when NULL with an error set (caller misuse)", () => {
+  it("nextTestCase throws on a non-OK code (caller misuse)", () => {
     const lib = new Libhegel(
-      fakeBindings({ nextTestCase: () => null, contextLastError: () => "not complete" }),
+      fakeBindings({
+        nextTestCase: (_ctx, _run, out) => {
+          out[0] = null;
+          return -7;
+        },
+        contextLastError: () => "not complete",
+      }),
     );
     expect(() => lib.nextTestCase(null, null)).toThrow(/not complete/);
   });
 
   it("nextTestCase returns the handle when non-null", () => {
     const handle = {} as Ptr;
-    const lib = new Libhegel(fakeBindings({ nextTestCase: () => handle }));
+    const lib = new Libhegel(
+      fakeBindings({
+        nextTestCase: (_ctx, _run, out) => {
+          out[0] = handle;
+          return 0;
+        },
+      }),
+    );
     expect(lib.nextTestCase(null, null)).toBe(handle);
   });
 
-  it("throws when run_result returns NULL", () => {
+  it("throws when run_result returns an error code", () => {
     const lib = new Libhegel(
-      fakeBindings({ runResult: () => null, contextLastError: () => "nope" }),
+      fakeBindings({
+        runResult: (_ctx, _run, out) => {
+          out[0] = null;
+          return -7;
+        },
+        contextLastError: () => "nope",
+      }),
     );
     expect(() => lib.runResult(null, null)).toThrow(/hegel_run_result failed: nope/);
+  });
+
+  it("throws when test_case_from_blob returns an error code", () => {
+    const lib = new Libhegel(
+      fakeBindings({
+        testCaseFromBlob: (_ctx, _s, _blob, out) => {
+          out[0] = null;
+          return -5;
+        },
+        contextLastError: () => "bad blob",
+      }),
+    );
+    expect(() => lib.testCaseFromBlob(null, null, "x")).toThrow(
+      /hegel_test_case_from_blob failed: bad blob/,
+    );
   });
 
   it("maps STOP_TEST to StopTestError", () => {
@@ -116,16 +174,16 @@ describe("Libhegel wrapper logic (fake bindings)", () => {
     expect(lib.lastError(null)).toBe("");
   });
 
-  it("failure getters map NULL to empty string; runError passes NULL through", () => {
+  it("failureOrigin maps NULL to empty; reproductionBlob and runError pass NULL through", () => {
     const lib = new Libhegel(
       fakeBindings({
-        failurePanicMessage: () => null,
         failureOrigin: () => null,
+        failureReproductionBlob: () => null,
         runResultError: () => null,
       }),
     );
-    expect(lib.failurePanicMessage(null)).toBe("");
     expect(lib.failureOrigin(null)).toBe("");
+    expect(lib.reproductionBlob(null)).toBeNull();
     expect(lib.runError(null)).toBeNull();
   });
 
@@ -185,8 +243,9 @@ describe("Libhegel wrapper logic (fake bindings)", () => {
     lib.setSuppressHealthCheck(null, 1);
     lib.collectionReject(null, null, 0n, "dup");
     lib.markComplete(null, null, Status.VALID, null);
-    expect(lib.isFinalReplay(null)).toBe(false);
     lib.freeRun(lib.runStart(null, null));
+    lib.freeTestCase(lib.testCaseFromBlob(null, null, "blob"));
+    expect(lib.reproductionBlob(null)).toBeNull();
     expect(lib.runStatus(null)).toBe(RunStatus.PASSED);
     expect(lib.failureCount(null)).toBe(0);
     expect(lib.failure(null, 0)).toBeNull();
@@ -202,7 +261,7 @@ function driveIntegerRun(
   lib: Libhegel,
   property: (n: number) => boolean,
   opts: { testCases?: number } = {},
-): { status: number; failureOrigin?: string; failurePanic?: string } {
+): { status: number; failureOrigin?: string; reproductionBlob?: string | null } {
   const ctx = lib.newContext();
   const settings = lib.newSettings();
   let run: Ptr | undefined;
@@ -234,7 +293,6 @@ function driveIntegerRun(
           throw e;
         }
       }
-      void lib.isFinalReplay(tc);
       lib.markComplete(ctx, tc, status, origin);
     }
 
@@ -245,7 +303,7 @@ function driveIntegerRun(
       return {
         status,
         failureOrigin: lib.failureOrigin(f),
-        failurePanic: lib.failurePanicMessage(f),
+        reproductionBlob: lib.reproductionBlob(f),
       };
     }
     return { status };
@@ -260,7 +318,7 @@ describe("Libhegel against the real library", () => {
   const lib = Libhegel.load(testLibPath());
 
   it("reports the expected version", () => {
-    expect(lib.version()).toBe("0.20.1");
+    expect(lib.version()).toBe("0.23.0");
   });
 
   it("passes a property that always holds", () => {
@@ -268,11 +326,11 @@ describe("Libhegel against the real library", () => {
     expect(res.status).toBe(RunStatus.PASSED);
   });
 
-  it("fails and surfaces a failure with origin for a false property", () => {
+  it("fails and surfaces a failure with origin and a reproduce blob for a false property", () => {
     const res = driveIntegerRun(lib, (n) => n < 50);
     expect(res.status).toBe(RunStatus.FAILED);
     expect(res.failureOrigin).toBe("test:integerRun");
-    expect(typeof res.failurePanic).toBe("string");
+    expect(typeof res.reproductionBlob).toBe("string");
   });
 
   it("throws a LibhegelError on a malformed schema", () => {

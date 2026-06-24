@@ -23,7 +23,7 @@ test runs; `just build-libhegel` builds it from a sibling `../hegel-rust`.
 A TypeScript implementation of the Hegel property-based testing library. Hegel is a
 universal property-based testing protocol powered by Hypothesis on the backend.
 This client drives **libhegel** — the native Rust engine (`hegel-rust/hegel-c`,
-version 0.20.1) — directly through its C ABI via the `koffi` FFI library. There
+version 0.23.0) — directly through its C ABI via the `koffi` FFI library. There
 is no subprocess and no wire protocol: the engine runs on a worker thread inside
 libhegel, and the client calls C functions synchronously.
 
@@ -108,13 +108,24 @@ suppression — that was a wire-protocol concern).
 ## libhegel C ABI
 
 The native engine is driven through the C functions declared in
-`hegel-rust/hegel-c/include/hegel.h` (version 0.20.1, the context-based ABI).
-Every fallible call takes a `hegel_context_t*` first argument and reports
-diagnostics via `hegel_context_last_error(ctx)`. Lifecycle:
-`hegel_run_start` → loop `hegel_next_test_case` (NULL = done) → per-case
-primitives → `hegel_mark_complete` → `hegel_run_result`. See `src/libhegel.ts`
-for the bound surface; the schema dicts the generators build are CBOR-encoded
-and passed to `hegel_generate`.
+`hegel-rust/hegel-c/include/hegel.h` (version 0.23.0). In this ABI every
+function except `hegel_context_new` / `hegel_context_last_error` takes a
+`hegel_context_t*` first argument and returns a `hegel_result_t` code (`HEGEL_OK`
+is zero; negatives are errors), writing any handle / string / count it produces
+through a trailing `out_*` parameter; diagnostics are read via
+`hegel_context_last_error(ctx)`. Lifecycle: `hegel_run_start` → loop
+`hegel_next_test_case` (NULL out = done) → per-case primitives →
+`hegel_mark_complete` → `hegel_run_result`. See `src/libhegel.ts` for the bound
+surface; the schema dicts the generators build are CBOR-encoded and passed to
+`hegel_generate`.
+
+The engine only _explores_ (generate / shrink) — there is no `is_final_replay`
+and no engine-supplied panic message. The client owns the final replay: once the
+loop drains and `hegel_run_result` reports `FAILED`, the runner replays each
+distinct failure's `hegel_failure_reproduction_blob` via
+`hegel_test_case_from_blob` (a caller-owned test case freed with
+`hegel_test_case_free`) to re-run the body and surface the test's own error for
+the thrown message.
 
 ## Tooling Choices
 

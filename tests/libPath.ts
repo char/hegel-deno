@@ -17,7 +17,7 @@ export function testLibPath(): string {
   if (!fs.existsSync(candidate)) {
     throw new Error(
       `libhegel not found at ${candidate}. Set HEGEL_LIBHEGEL_PATH or download the ` +
-        `v0.20.1 artifact into .hegel/.`,
+        `v0.23.0 artifact into .hegel/.`,
     );
   }
   return candidate;

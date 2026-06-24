@@ -342,16 +342,6 @@ function configureSettings(
   }
 }
 
-/** Join the distinct failure origins of a failed run for the error message. */
-function describeFailures(lib: Libhegel, result: Ptr): string {
-  const n = lib.failureCount(result);
-  const parts: string[] = [];
-  for (let i = 0; i < n; i++) {
-    parts.push(lib.failureOrigin(lib.failure(result, i)));
-  }
-  return parts.join("; ");
-}
-
 export class Hegel {
   private testFn: (tc: TestCase) => void | Promise<void>;
   private _settings: Settings;
@@ -379,9 +369,16 @@ export class Hegel {
   /**
    * Generator that drives the libhegel run loop, yielding a
    * {@link NativeDataSource} (plus an `isFinal` flag) for each test case the
-   * engine produces. The driver ({@link run} or {@link runSync}) executes the
-   * user's body and resumes the generator with the {@link TestCaseResult}. This
-   * factoring lets the sync and async drivers share one loop implementation.
+   * driver ({@link run} or {@link runSync}) should execute the body against. The
+   * driver runs the user's body and resumes the generator with the
+   * {@link TestCaseResult}. This factoring lets the sync and async drivers share
+   * one loop implementation.
+   *
+   * The engine only *explores* (generate / shrink), so every pumped case is
+   * non-final. The client owns the final replays: once the loop drains and the
+   * run has failed, each discovered counterexample's reproduce blob is replayed
+   * (via `hegel_test_case_from_blob`) as a final case to surface the test's own
+   * error for the thrown message.
    */
   private *runSteps(): Generator<{ ds: NativeDataSource; isFinal: boolean }, void, TestCaseResult> {
     const lib = getLibhegel();
@@ -391,16 +388,11 @@ export class Hegel {
       configureSettings(lib, ctx, settings, this._settings, this.testFn);
       const run = lib.runStart(ctx, settings);
       try {
-        let finalError: unknown = null;
         for (;;) {
           const tc = lib.nextTestCase(ctx, run);
           if (tc === null) break;
-          const isFinal = lib.isFinalReplay(tc);
           const ds = new NativeDataSource(lib, ctx, tc);
-          const result = yield { ds, isFinal };
-          if (isFinal && result.status === "interesting") {
-            finalError = result.error;
-          }
+          yield { ds, isFinal: false };
         }
 
         const result = lib.runResult(ctx, run);
@@ -418,10 +410,26 @@ export class Hegel {
         if (status === RunStatus.ERROR) {
           throw new Error(`Property test failed: ${lib.runError(result)}`);
         }
-        // RunStatus.FAILED: the engine always replays the minimal counterexample
-        // (is_final_replay), so finalError holds the error the body threw.
+        // RunStatus.FAILED: replay each distinct counterexample's blob as a
+        // final, client-owned case. A genuine counterexample re-fails on replay,
+        // so the body throws its own error again — captured here for the message.
+        const count = lib.failureCount(result);
+        const origins: string[] = [];
+        let finalError: unknown = null;
+        for (let i = 0; i < count; i++) {
+          const failure = lib.failure(result, i);
+          origins.push(lib.failureOrigin(failure));
+          const replayTc = lib.testCaseFromBlob(ctx, settings, lib.reproductionBlob(failure));
+          try {
+            const ds = new NativeDataSource(lib, ctx, replayTc);
+            const replay = yield { ds, isFinal: true };
+            finalError = (replay as { error?: unknown }).error;
+          } finally {
+            lib.freeTestCase(replayTc);
+          }
+        }
         const detail = finalError instanceof Error ? finalError.message : String(finalError);
-        throw new Error(`Property test failed: ${detail} [${describeFailures(lib, result)}]`);
+        throw new Error(`Property test failed: ${detail} [${origins.join("; ")}]`);
       } finally {
         lib.freeRun(run);
       }

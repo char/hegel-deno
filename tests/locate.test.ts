@@ -117,7 +117,7 @@ describe("ensureLibrarySync (injected spawn)", () => {
     arch: HOST_ARCH,
     homeDir: "/home/u",
     execPath: "/usr/bin/node",
-    version: "0.20.1",
+    version: "0.23.0",
   };
 
   it("returns the explicit override without downloading", () => {

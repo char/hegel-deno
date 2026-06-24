@@ -1,18 +1,22 @@
 /**
  * Thin, typed binding to the native `libhegel` C ABI (see
- * `hegel-rust/hegel-c/include/hegel.h`, version 0.20.1) via {@link koffi}.
+ * `hegel-rust/hegel-c/include/hegel.h`, version 0.23.0) via {@link koffi}.
  *
  * The {@link Libhegel} class owns the loaded library's function pointers and
- * exposes ergonomic wrappers: opaque handles are passed around as untyped
- * pointers, `int`-returning fallible calls are mapped to thrown errors
- * ({@link StopTestError} for the choice-budget-exhausted case, otherwise
- * {@link LibhegelError} carrying the diagnostic from `hegel_context_last_error`),
- * and the `hegel_generate` out-pointer is read back into a {@link Buffer}.
+ * exposes ergonomic wrappers. Every fallible call takes a `hegel_context_t*`
+ * first argument and returns a `hegel_result_t` code (`HEGEL_OK` is zero;
+ * negatives are errors), writing any value it produces — a handle, a string, a
+ * count — through a trailing out-parameter. The wrappers map those codes to
+ * thrown errors ({@link StopTestError} / {@link AssumeError} for the
+ * choice-budget / rejected-draw cases, otherwise {@link LibhegelError} carrying
+ * the diagnostic from `hegel_context_last_error`) and read the out-parameters
+ * back into JS values.
  *
- * libhegel does not free anything for you: every handle from a constructor
- * (`hegel_context_new`, `hegel_settings_new`, `hegel_run_start`) must be
- * released by the caller (the runner does so in `finally` blocks). Test cases
- * from `hegel_next_test_case` are borrowed and released by `hegel_run_free`.
+ * libhegel frees nothing for you: every handle from a constructor
+ * (`hegel_context_new`, `hegel_settings_new`, `hegel_run_start`,
+ * `hegel_test_case_from_blob`) must be released by the caller with its matching
+ * free (the runner does so in `finally` blocks). Test cases from
+ * `hegel_next_test_case` are borrowed and released by `hegel_run_free`.
  *
  * @packageDocumentation
  */
@@ -61,7 +65,15 @@ export class LibhegelError extends Error {
   }
 }
 
-/** The set of C functions bound from the shared library. */
+/**
+ * The set of C functions bound from the shared library.
+ *
+ * Fallible calls return the `hegel_result_t` code and write their handle / value
+ * through a trailing JS out-array (`[null]`, `[0]`); the infallible-for-our-use
+ * accessors (constructors, frees, setters, result getters) are presented here as
+ * value-returning wrappers, with the C ABI's `out_*` marshalling and the
+ * always-`HEGEL_OK` return code absorbed by {@link bindLibrary}.
+ */
 export interface Bindings {
   contextNew: () => Ptr;
   contextFree: (ctx: Ptr) => void;
@@ -77,10 +89,13 @@ export interface Bindings {
   settingsDatabaseKey: (ctx: Ptr, s: Ptr, key: string | null) => void;
   settingsSuppressHealthCheck: (s: Ptr, checks: number) => void;
 
-  runStart: (ctx: Ptr, settings: Ptr) => Ptr;
-  nextTestCase: (ctx: Ptr, run: Ptr) => Ptr;
-  runResult: (ctx: Ptr, run: Ptr) => Ptr;
+  runStart: (ctx: Ptr, settings: Ptr, out: Ptr[]) => number;
+  nextTestCase: (ctx: Ptr, run: Ptr, out: Ptr[]) => number;
+  runResult: (ctx: Ptr, run: Ptr, out: Ptr[]) => number;
   runFree: (run: Ptr) => void;
+
+  testCaseFromBlob: (ctx: Ptr, s: Ptr, blob: string | null, out: Ptr[]) => number;
+  testCaseFree: (tc: Ptr) => void;
 
   generate: (
     ctx: Ptr,
@@ -96,14 +111,13 @@ export interface Bindings {
   collectionMore: (ctx: Ptr, tc: Ptr, id: bigint, out: boolean[]) => number;
   collectionReject: (ctx: Ptr, tc: Ptr, id: bigint, why: string | null) => number;
   markComplete: (ctx: Ptr, tc: Ptr, status: number, origin: string | null) => number;
-  isFinalReplay: (tc: Ptr) => boolean;
 
   runResultStatus: (r: Ptr) => number;
   runResultError: (r: Ptr) => string | null;
   runResultFailureCount: (r: Ptr) => number;
   runResultFailure: (r: Ptr, index: number) => Ptr;
-  failurePanicMessage: (f: Ptr) => string | null;
   failureOrigin: (f: Ptr) => string | null;
+  failureReproductionBlob: (f: Ptr) => string | null;
 
   version: () => string;
 }
@@ -111,6 +125,12 @@ export interface Bindings {
 /**
  * Bind every libhegel function used by the client against a loaded koffi
  * library handle.
+ *
+ * Calls that cannot fail for the inputs the client gives them (constructors,
+ * frees, setters, result getters) pass a NULL context — which the ABI accepts,
+ * simply opting out of error messages — and discard the result code here; the
+ * genuinely fallible calls return the code for {@link Libhegel} to map to an
+ * exception.
  */
 export function bindLibrary(lib: LibraryHandle): Bindings {
   // The koffi FFI boundary is inherently dynamically typed; `Bindings` re-imposes
@@ -121,24 +141,31 @@ export function bindLibrary(lib: LibraryHandle): Bindings {
   const contextFree = f("void hegel_context_free(void* ctx)");
   const contextLastError = f("const char* hegel_context_last_error(void* ctx)");
 
-  const settingsNew = f("void* hegel_settings_new()");
-  const settingsFree = f("void hegel_settings_free(void* s)");
-  const settingsTestCases = f("void hegel_settings_test_cases(void* s, uint64_t n)");
-  const settingsVerbosity = f("void hegel_settings_verbosity(void* s, int v)");
-  const settingsSeed = f("void hegel_settings_seed(void* s, uint64_t seed, bool has_seed)");
-  const settingsDerandomize = f("void hegel_settings_derandomize(void* s, bool d)");
-  const settingsDatabase = f("void hegel_settings_database(void* ctx, void* s, const char* db)");
+  const settingsNew = f("int hegel_settings_new(void* ctx, _Out_ void** out)");
+  const settingsFree = f("void hegel_settings_free(void* ctx, void* s)");
+  const settingsTestCases = f("int hegel_settings_set_test_cases(void* ctx, void* s, uint64_t n)");
+  const settingsVerbosity = f("int hegel_settings_set_verbosity(void* ctx, void* s, int v)");
+  const settingsSeed = f(
+    "int hegel_settings_set_seed(void* ctx, void* s, uint64_t seed, bool has_seed)",
+  );
+  const settingsDerandomize = f("int hegel_settings_set_derandomize(void* ctx, void* s, bool d)");
+  const settingsDatabase = f("int hegel_settings_set_database(void* ctx, void* s, const char* db)");
   const settingsDatabaseKey = f(
-    "void hegel_settings_database_key(void* ctx, void* s, const char* key)",
+    "int hegel_settings_set_database_key(void* ctx, void* s, const char* key)",
   );
   const settingsSuppressHealthCheck = f(
-    "void hegel_settings_suppress_health_check(void* s, uint32_t checks)",
+    "int hegel_settings_set_suppress_health_check(void* ctx, void* s, uint32_t checks)",
   );
 
-  const runStart = f("void* hegel_run_start(void* ctx, void* settings)");
-  const nextTestCase = f("void* hegel_next_test_case(void* ctx, void* run)");
-  const runResult = f("void* hegel_run_result(void* ctx, void* run)");
-  const runFree = f("void hegel_run_free(void* run)");
+  const runStart = f("int hegel_run_start(void* ctx, void* settings, _Out_ void** out_run)");
+  const nextTestCase = f("int hegel_next_test_case(void* ctx, void* run, _Out_ void** out_tc)");
+  const runResult = f("int hegel_run_result(void* ctx, void* run, _Out_ void** out_result)");
+  const runFree = f("void hegel_run_free(void* ctx, void* run)");
+
+  const testCaseFromBlob = f(
+    "int hegel_test_case_from_blob(void* ctx, void* s, const char* blob, _Out_ void** out_tc)",
+  );
+  const testCaseFree = f("void hegel_test_case_free(void* ctx, void* tc)");
 
   const generate = f(
     "int hegel_generate(void* ctx, void* tc, uint8_t* schema, size_t schema_len, _Out_ void** out, _Out_ size_t* out_len)",
@@ -157,33 +184,44 @@ export function bindLibrary(lib: LibraryHandle): Bindings {
   const markComplete = f(
     "int hegel_mark_complete(void* ctx, void* tc, int status, const char* origin)",
   );
-  const isFinalReplay = f("bool hegel_test_case_is_final_replay(void* tc)");
 
-  const runResultStatus = f("int hegel_run_result_status(void* r)");
-  const runResultError = f("const char* hegel_run_result_error(void* r)");
-  const runResultFailureCount = f("size_t hegel_run_result_failure_count(void* r)");
-  const runResultFailure = f("void* hegel_run_result_failure(void* r, size_t index)");
-  const failurePanicMessage = f("const char* hegel_failure_panic_message(void* f)");
-  const failureOrigin = f("const char* hegel_failure_origin(void* f)");
-  const version = f("const char* hegel_version()");
+  const runResultStatus = f("int hegel_run_result_status(void* ctx, void* r, _Out_ int* out)");
+  const runResultError = f("int hegel_run_result_error(void* ctx, void* r, _Out_ char** out)");
+  const runResultFailureCount = f(
+    "int hegel_run_result_failure_count(void* ctx, void* r, _Out_ size_t* out)",
+  );
+  const runResultFailure = f(
+    "int hegel_run_result_failure(void* ctx, void* r, size_t index, _Out_ void** out)",
+  );
+  const failureOrigin = f("int hegel_failure_origin(void* ctx, void* f, _Out_ char** out)");
+  const failureReproductionBlob = f(
+    "int hegel_failure_reproduction_blob(void* ctx, void* f, _Out_ char** out)",
+  );
+  const version = f("int hegel_version(void* ctx, _Out_ char** out)");
 
   return {
     contextNew: () => contextNew(),
     contextFree: (ctx) => contextFree(ctx),
     contextLastError: (ctx) => contextLastError(ctx),
-    settingsNew: () => settingsNew(),
-    settingsFree: (s) => settingsFree(s),
-    settingsTestCases: (s, n) => settingsTestCases(s, n),
-    settingsVerbosity: (s, v) => settingsVerbosity(s, v),
-    settingsSeed: (s, seed, hasSeed) => settingsSeed(s, seed, hasSeed),
-    settingsDerandomize: (s, on) => settingsDerandomize(s, on),
-    settingsDatabase: (ctx, s, db) => settingsDatabase(ctx, s, db),
-    settingsDatabaseKey: (ctx, s, key) => settingsDatabaseKey(ctx, s, key),
-    settingsSuppressHealthCheck: (s, checks) => settingsSuppressHealthCheck(s, checks),
-    runStart: (ctx, s) => runStart(ctx, s),
-    nextTestCase: (ctx, run) => nextTestCase(ctx, run),
-    runResult: (ctx, run) => runResult(ctx, run),
-    runFree: (run) => runFree(run),
+    settingsNew: () => {
+      const out: Ptr[] = [null];
+      settingsNew(null, out);
+      return out[0];
+    },
+    settingsFree: (s) => settingsFree(null, s),
+    settingsTestCases: (s, n) => void settingsTestCases(null, s, n),
+    settingsVerbosity: (s, v) => void settingsVerbosity(null, s, v),
+    settingsSeed: (s, seed, hasSeed) => void settingsSeed(null, s, seed, hasSeed),
+    settingsDerandomize: (s, on) => void settingsDerandomize(null, s, on),
+    settingsDatabase: (ctx, s, db) => void settingsDatabase(ctx, s, db),
+    settingsDatabaseKey: (ctx, s, key) => void settingsDatabaseKey(ctx, s, key),
+    settingsSuppressHealthCheck: (s, checks) => void settingsSuppressHealthCheck(null, s, checks),
+    runStart: (ctx, s, out) => runStart(ctx, s, out),
+    nextTestCase: (ctx, run, out) => nextTestCase(ctx, run, out),
+    runResult: (ctx, run, out) => runResult(ctx, run, out),
+    runFree: (run) => runFree(null, run),
+    testCaseFromBlob: (ctx, s, blob, out) => testCaseFromBlob(ctx, s, blob, out),
+    testCaseFree: (tc) => testCaseFree(null, tc),
     generate: (ctx, tc, schema, schemaLen, out, outLen) =>
       generate(ctx, tc, schema, schemaLen, out, outLen),
     startSpan: (ctx, tc, label) => startSpan(ctx, tc, label),
@@ -192,14 +230,43 @@ export function bindLibrary(lib: LibraryHandle): Bindings {
     collectionMore: (ctx, tc, id, out) => collectionMore(ctx, tc, id, out),
     collectionReject: (ctx, tc, id, why) => collectionReject(ctx, tc, id, why),
     markComplete: (ctx, tc, status, origin) => markComplete(ctx, tc, status, origin),
-    isFinalReplay: (tc) => isFinalReplay(tc),
-    runResultStatus: (r) => runResultStatus(r),
-    runResultError: (r) => runResultError(r),
-    runResultFailureCount: (r) => Number(runResultFailureCount(r)),
-    runResultFailure: (r, index) => runResultFailure(r, index),
-    failurePanicMessage: (fp) => failurePanicMessage(fp),
-    failureOrigin: (fp) => failureOrigin(fp),
-    version: () => version(),
+    runResultStatus: (r) => {
+      const out: number[] = [0];
+      runResultStatus(null, r, out);
+      return out[0];
+    },
+    runResultError: (r) => {
+      const out: (string | null)[] = [null];
+      runResultError(null, r, out);
+      return out[0];
+    },
+    runResultFailureCount: (r) => {
+      const out: (number | bigint)[] = [0];
+      runResultFailureCount(null, r, out);
+      return Number(out[0]);
+    },
+    runResultFailure: (r, index) => {
+      const out: Ptr[] = [null];
+      runResultFailure(null, r, index, out);
+      return out[0];
+    },
+    failureOrigin: (fp) => {
+      const out: (string | null)[] = [null];
+      failureOrigin(null, fp, out);
+      return out[0];
+    },
+    failureReproductionBlob: (fp) => {
+      const out: (string | null)[] = [null];
+      failureReproductionBlob(null, fp, out);
+      return out[0];
+    },
+    version: () => {
+      // `hegel_version` always writes a non-null static string (it only fails on
+      // a NULL out-pointer, which we never pass), so the seeded "" is never read.
+      const out: string[] = [""];
+      version(null, out);
+      return out[0];
+    },
   };
 }
 
@@ -274,36 +341,26 @@ export class Libhegel {
 
   /** Start a run. Throws {@link LibhegelError} on failure. */
   runStart(ctx: Ptr, settings: Ptr): Ptr {
-    const run = this.fns.runStart(ctx, settings);
-    if (run === null) {
-      throw new LibhegelError(`hegel_run_start failed: ${this.lastError(ctx)}`, -1);
-    }
-    return run;
+    const out: Ptr[] = [null];
+    this.check(ctx, this.fns.runStart(ctx, settings, out), "hegel_run_start");
+    return out[0];
   }
 
   /**
    * Pull the next test case, or `null` when the run is finished. Throws if the
-   * engine reported a mid-run error.
+   * engine reported a mid-run error (e.g. the previous case was not completed).
    */
   nextTestCase(ctx: Ptr, run: Ptr): Ptr | null {
-    const tc = this.fns.nextTestCase(ctx, run);
-    if (tc === null) {
-      const err = this.lastError(ctx);
-      if (err !== "") {
-        throw new LibhegelError(`hegel_next_test_case failed: ${err}`, -1);
-      }
-      return null;
-    }
-    return tc;
+    const out: Ptr[] = [null];
+    this.check(ctx, this.fns.nextTestCase(ctx, run, out), "hegel_next_test_case");
+    return out[0] ?? null;
   }
 
   /** Read the aggregated run result. Throws on failure. */
   runResult(ctx: Ptr, run: Ptr): Ptr {
-    const r = this.fns.runResult(ctx, run);
-    if (r === null) {
-      throw new LibhegelError(`hegel_run_result failed: ${this.lastError(ctx)}`, -1);
-    }
-    return r;
+    const out: Ptr[] = [null];
+    this.check(ctx, this.fns.runResult(ctx, run, out), "hegel_run_result");
+    return out[0];
   }
 
   freeRun(run: Ptr): void {
@@ -311,9 +368,29 @@ export class Libhegel {
   }
 
   /**
+   * Build a standalone test case that replays a base64 failure blob (from
+   * {@link reproductionBlob}). Owned by the caller — release with
+   * {@link freeTestCase}. Throws {@link LibhegelError} on a malformed blob.
+   */
+  testCaseFromBlob(ctx: Ptr, settings: Ptr, blob: string | null): Ptr {
+    const out: Ptr[] = [null];
+    this.check(
+      ctx,
+      this.fns.testCaseFromBlob(ctx, settings, blob, out),
+      "hegel_test_case_from_blob",
+    );
+    return out[0];
+  }
+
+  freeTestCase(tc: Ptr): void {
+    this.fns.testCaseFree(tc);
+  }
+
+  /**
    * Map a fallible `int`-returning result code to an exception.
-   * `HEGEL_E_STOP_TEST` becomes {@link StopTestError}; any other non-OK code
-   * becomes a {@link LibhegelError} carrying the context diagnostic.
+   * `HEGEL_E_STOP_TEST` becomes {@link StopTestError}, `HEGEL_E_ASSUME` becomes
+   * {@link AssumeError}; any other non-OK code becomes a {@link LibhegelError}
+   * carrying the context diagnostic.
    */
   private check(ctx: Ptr, code: number, op: string): void {
     if (code === RESULT_OK) {
@@ -369,10 +446,6 @@ export class Libhegel {
     this.check(ctx, this.fns.markComplete(ctx, tc, status, origin), "hegel_mark_complete");
   }
 
-  isFinalReplay(tc: Ptr): boolean {
-    return this.fns.isFinalReplay(tc);
-  }
-
   runStatus(r: Ptr): number {
     return this.fns.runResultStatus(r);
   }
@@ -389,11 +462,15 @@ export class Libhegel {
     return this.fns.runResultFailure(r, index);
   }
 
-  failurePanicMessage(fp: Ptr): string {
-    return this.fns.failurePanicMessage(fp) ?? "";
-  }
-
   failureOrigin(fp: Ptr): string {
     return this.fns.failureOrigin(fp) ?? "";
+  }
+
+  /**
+   * The failure's base64 reproduce blob, or `null` if the engine produced none.
+   * Replay it via {@link testCaseFromBlob} to surface the test's own error.
+   */
+  reproductionBlob(fp: Ptr): string | null {
+    return this.fns.failureReproductionBlob(fp);
   }
 }
