@@ -1,28 +1,11 @@
 set ignore-comments := true
 
-# Download the host's published libhegel artifact into .hegel/ (if missing) and
-# print its path. Used to run tests offline against the real native library.
-fetch-libhegel:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    version="$(sed -n 's/^export const LIBHEGEL_VERSION = "\([^"]*\)";/\1/p' src/checksums.ts)"
-    case "$(uname -s)" in
-      Linux) os=linux; ext=so;;
-      Darwin) os=darwin; ext=dylib;;
-      *) os=windows; ext=dll;;
-    esac
-    case "$(uname -m)" in
-      x86_64|amd64) arch=amd64;;
-      aarch64|arm64) arch=arm64;;
-      *) echo "unsupported arch $(uname -m)" >&2; exit 1;;
-    esac
-    asset="libhegel-${os}-${arch}.${ext}"
-    mkdir -p .hegel
-    if [ ! -f ".hegel/${asset}" ]; then
-      curl -fsSL "https://github.com/hegeldev/hegel-rust/releases/download/v${version}/${asset}" \
-        -o ".hegel/${asset}"
-    fi
-    echo "${PWD}/.hegel/${asset}"
+# Download the host's published libhegel artifact into native/ (if missing,
+# verified against the pinned checksum) and print its path. Used to run tests
+# against the real native library; the same script with --all bundles every
+# platform's artifact at npm pack time (see package.json `prepack`).
+@fetch-libhegel:
+    node scripts/fetch-libhegel.mjs
 
 # Build libhegel from a sibling ../hegel-rust checkout (for local development
 # against an unreleased engine). Prints the path to export as
@@ -43,7 +26,7 @@ update-checksums version="":
 check-test:
     #!/usr/bin/env bash
     set -euo pipefail
-    export HEGEL_LIBHEGEL_PATH="$(just fetch-libhegel)"
+    node scripts/fetch-libhegel.mjs > /dev/null
     npx vitest run --coverage
     python3 scripts/check-coverage.py
 

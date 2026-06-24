@@ -24,10 +24,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "native"
   ],
   "scripts": {
     "build": "tsc",
+    "prepack": "node scripts/fetch-libhegel.mjs --all",
     "test": "vitest run --coverage",
     "lint": "prettier --check . && eslint . && tsc --noEmit",
     "format": "prettier --write .",

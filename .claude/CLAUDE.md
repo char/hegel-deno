@@ -11,12 +11,14 @@ just docs    # Build API documentation
 just check   # Run lint + docs + test (full CI check)
 ```
 
-The native `libhegel` shared library is auto-downloaded (per platform, SHA-256
-verified) on first use and cached under `~/.cache/hegel-typescript/` (see
-`src/locate.ts`). Set `HEGEL_LIBHEGEL_PATH` to point at a local build to skip
-the download; `HEGEL_LIBHEGEL_NO_DOWNLOAD=1` opts out of the download fallback.
-`just fetch-libhegel` downloads the host artifact into `.hegel/` for offline
-test runs; `just build-libhegel` builds it from a sibling `../hegel-rust`.
+The per-platform `libhegel` shared libraries are bundled into the published npm
+package under `native/` (added to the tarball by the `prepack` script, which
+runs `scripts/fetch-libhegel.mjs --all` to download every artifact, SHA-256
+verified against `src/checksums.ts`). At runtime `src/locate.ts` just loads the
+bundled artifact for the host platform — no download, no cache. Set
+`HEGEL_LIBHEGEL_PATH` to point at a local build to override it. `just
+fetch-libhegel` downloads the host artifact into `native/` for test runs; `just
+build-libhegel` builds it from a sibling `../hegel-rust`.
 
 ## What This Is
 
@@ -31,8 +33,10 @@ libhegel, and the client calls C functions synchronously.
 
 The library is structured in layers, each building on the previous:
 
-1. **Library loading** (`src/locate.ts`, `src/checksums.ts`) — resolve / download
-   / verify the native `libhegel` shared library for the host platform.
+1. **Library loading** (`src/locate.ts`, `src/checksums.ts`) — resolve the
+   bundled `native/` shared library for the host platform (or the
+   `HEGEL_LIBHEGEL_PATH` override). `src/checksums.ts` pins the version + digests
+   used by `scripts/fetch-libhegel.mjs` to populate `native/` at pack time.
 2. **FFI binding** (`src/libhegel.ts`) — `koffi` bindings to the libhegel C ABI,
    wrapped in a typed `Libhegel` class. `int`-returning fallible calls map to
    thrown errors (`StopTestError` for `HEGEL_E_STOP_TEST`, `AssumeError` for
@@ -77,11 +81,9 @@ runner; test cases from `next_test_case` are borrowed and freed by `run_free`.
   misuse) and use injected fake `Bindings` for the few NULL-return / result-code
   branches the engine can't easily be driven into — do NOT use `# nocov`.
 - **Use the real `libhegel` library** for integration tests. Never write a mock
-  engine. The engine runs on its own worker thread inside libhegel.
-- A note on in-test downloads: `spawnSync` blocks the event loop, so a download
-  test must not point the child at an in-process HTTP server (deadlock). Test the
-  inline downloader via async `spawn`, and the resolution logic via injected
-  spawn results.
+  engine. The engine runs on its own worker thread inside libhegel. The host
+  artifact is fetched into `native/` (`just fetch-libhegel`) before the run; the
+  resolution logic in `src/locate.ts` is unit-tested with an injected `nativeDir`.
 
 ## Composing generators
 
@@ -143,14 +145,16 @@ the thrown message.
 
 ### Build Commands Detail
 
-- `just test` — `just fetch-libhegel` (download the host artifact into `.hegel/`
-  and export `HEGEL_LIBHEGEL_PATH`), then `npx vitest run --coverage` and
+- `just test` — `node scripts/fetch-libhegel.mjs` (download the host artifact
+  into `native/`), then `npx vitest run --coverage` and
   `python3 scripts/check-coverage.py`
 - `just lint` — `npx prettier --check . && npx eslint . && npx tsc --noEmit`
 - `just format` — `npx prettier --write .`
 - `just docs` — `npx typedoc` (with `treatWarningsAsErrors: true`)
 - `just fetch-libhegel` / `just build-libhegel` — obtain the native library
-  (download the release, or build from a sibling `../hegel-rust`)
+  (download the release into `native/`, or build from a sibling `../hegel-rust`)
+- `npm pack` / `npm publish` — `prepack` runs `scripts/fetch-libhegel.mjs --all`
+  to fetch every platform's artifact into `native/`, bundled via `files`
 
 ## Project Conventions
 
@@ -159,7 +163,7 @@ the thrown message.
 ```
 src/                 — Library source code (all production code)
   index.ts           — Public API entry point
-  locate.ts          — Locate / download / verify the native libhegel library
+  locate.ts          — Resolve the bundled native/ libhegel library (or override)
   checksums.ts       — Pinned libhegel version + per-platform SHA-256 checksums
   libhegel.ts        — koffi bindings to the libhegel C ABI + typed `Libhegel` wrapper
   cbor.ts            — CBOR codec with the tag-91 (WTF-8 string) extension
@@ -178,10 +182,11 @@ src/                 — Library source code (all production code)
     tuples.ts        — tuples
 tests/               — Test files (excluded from coverage)
   *.test.ts          — Vitest test files (one per module)
-  libPath.ts         — Resolves the libhegel path for tests (env or .hegel/)
+  libPath.ts         — Resolves the libhegel path for tests (env or native/)
 scripts/             — Build/CI scripts
   check-coverage.py  — Secondary coverage validation script
-.hegel/              — Downloaded libhegel artifact for offline tests (gitignored)
+  fetch-libhegel.mjs — Download libhegel artifact(s) into native/ (host, or --all)
+native/              — Bundled libhegel shared libraries (gitignored; in tarball)
 README.md            — Project overview and quick start
 dist/                — Compiled output (gitignored)
 docs/                — Generated TypeDoc output (gitignored)
@@ -236,14 +241,12 @@ coverage/            — Coverage reports (gitignored)
 - **koffi types** are named exports, not properties of the default import:
   `import koffi, { type LibraryHandle } from "koffi"`. The FFI call boundary is
   inherently `any`; re-impose static types via a `Bindings` interface.
-- **`spawnSync` + an in-process HTTP server deadlocks** — `spawnSync` blocks the
-  event loop so the server never answers the child. The synchronous first-run
-  downloader (`ensureLibrarySync`) runs a child `node` for exactly this reason;
-  test the inline downloader program with async `spawn`, and the surrounding
-  logic with injected `spawn` results.
-- **`hegel.test` is synchronous**, so library resolution must be synchronous.
-  The override (`HEGEL_LIBHEGEL_PATH`) and cache-hit paths are pure fs; only the
-  one-time download shells out to a child process.
+- **The native libraries are bundled, not downloaded at runtime.** All five
+  per-platform artifacts ship inside the npm tarball under `native/` (fetched at
+  pack time by `scripts/fetch-libhegel.mjs --all`, SHA-256 verified against the
+  baked-in `src/checksums.ts`). `hegel.test` is synchronous, so library
+  resolution (`src/locate.ts`) must be too — and now it is trivially: an
+  `HEGEL_LIBHEGEL_PATH` override or a pure `fs.existsSync` of the bundled file.
 
 ### General
 
