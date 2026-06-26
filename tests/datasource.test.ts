@@ -27,8 +27,7 @@ class FakeDataSource implements DataSource {
   private _throwOnStopSpan: boolean;
   private _collectionCounts: number;
   private _collectionCallCount = 0;
-  private _aborted: boolean;
-  private _markCompleteCalls: Array<{ status: string; origin: string | null }> = [];
+  private _markCompleteCalls: Array<{ status: number; origin: string | null }> = [];
   private _newCollectionReturn: number;
 
   constructor(
@@ -37,7 +36,6 @@ class FakeDataSource implements DataSource {
       throwOnStartSpan?: boolean;
       throwOnStopSpan?: boolean;
       collectionCounts?: number;
-      aborted?: boolean;
       newCollectionReturn?: number;
     } = {},
   ) {
@@ -45,7 +43,6 @@ class FakeDataSource implements DataSource {
     this._throwOnStartSpan = opts.throwOnStartSpan ?? false;
     this._throwOnStopSpan = opts.throwOnStopSpan ?? false;
     this._collectionCounts = opts.collectionCounts ?? 0;
-    this._aborted = opts.aborted ?? false;
     this._newCollectionReturn = opts.newCollectionReturn ?? 1;
   }
 
@@ -84,12 +81,8 @@ class FakeDataSource implements DataSource {
     // no-op
   }
 
-  markComplete(status: string, origin: string | null): void {
+  markComplete(status: number, origin: string | null): void {
     this._markCompleteCalls.push({ status, origin });
-  }
-
-  testAborted(): boolean {
-    return this._aborted;
   }
 
   get markCompleteCalls() {
@@ -153,12 +146,6 @@ describe("TestCase with fake DataSource", () => {
     tc.note("hello");
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
-  });
-
-  it("testAborted returns dataSource.testAborted()", () => {
-    const ds = new FakeDataSource({ aborted: true });
-    const tc = new TestCase(ds, false);
-    expect(tc.testAborted).toBe(true);
   });
 
   it("assume(false) throws AssumeError", () => {
@@ -412,7 +399,7 @@ describe("oneOf parse paths", () => {
     expect(basic).not.toBeNull();
     expect(basic!.schema).toEqual({
       type: "one_of",
-      generators: [{ type: "integer", min_value: 0, max_value: 10 }, { type: "boolean" }],
+      generators: [{ type: "integer", min_value: 0n, max_value: 10n }, { type: "boolean" }],
     });
     // Guard against accidental re-introduction of the legacy
     // [constant(i), child] tuple wrapping.

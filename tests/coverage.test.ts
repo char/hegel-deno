@@ -189,97 +189,6 @@ describe("float edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// HEGEL_PROTOCOL_TEST_MODE: stop_test_on_generate
-// (Server sends StopTest on 1st generate of 2nd test case)
-// ---------------------------------------------------------------------------
-
-describe("HEGEL_PROTOCOL_TEST_MODE", () => {
-  async function withTestMode(mode: string, fn: () => Promise<void>) {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = mode;
-      await fn();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  }
-
-  test("stop_test_on_generate: resolves without error", () =>
-    // This should complete without throwing - StopTest marks test case invalid
-    withTestMode("stop_test_on_generate", () =>
-      hegel.test(
-        (tc) => {
-          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-        },
-        { testCases: 10 },
-      ),
-    ));
-
-  test("error_response: resolves without throwing", () =>
-    withTestMode("error_response", () =>
-      hegel.test(
-        (tc) => {
-          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-        },
-        { testCases: 10 },
-      ),
-    ));
-
-  test("empty_test: resolves without throwing", () =>
-    withTestMode("empty_test", () =>
-      hegel.test(
-        (tc) => {
-          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-        },
-        { testCases: 10 },
-      ),
-    ));
-
-  test("stop_test_on_collection_more: resolves without throwing", () =>
-    // Use composite generator to force collection protocol
-    withTestMode("stop_test_on_collection_more", () =>
-      hegel.test(
-        (tc) => {
-          const gen = gs.arrays(
-            gs.composite((inner) => inner.draw(gs.integers({ minValue: 0, maxValue: 100 }))),
-            { minSize: 1, maxSize: 10 },
-          );
-          tc.draw(gen);
-        },
-        { testCases: 10 },
-      ),
-    ));
-
-  test("stop_test_on_new_collection: resolves without throwing", () =>
-    withTestMode("stop_test_on_new_collection", () =>
-      hegel.test(
-        (tc) => {
-          const gen = gs.arrays(
-            gs.composite((inner) => inner.draw(gs.integers({ minValue: 0, maxValue: 100 }))),
-            { minSize: 1, maxSize: 10 },
-          );
-          tc.draw(gen);
-        },
-        { testCases: 10 },
-      ),
-    ));
-
-  test("stop_test_on_mark_complete: resolves without throwing", () =>
-    withTestMode("stop_test_on_mark_complete", () =>
-      hegel.test(
-        (tc) => {
-          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-        },
-        { testCases: 10 },
-      ),
-    ));
-});
-
-// ---------------------------------------------------------------------------
 // Shrinking (from hegel-rust test_output.rs)
 // ---------------------------------------------------------------------------
 
@@ -370,16 +279,18 @@ describe("edge cases", () => {
       expect(x).toBe(obj); // Same reference
     }));
 
-  test("assume(false) does not hang", () =>
-    hegel.test(
-      (tc) => {
+  test("assume(false) rejects every case (FilterTooMuch), never reaching the body", () => {
+    // assume(false) discards every case, so the assertion below is never
+    // reached. With no valid case ever produced, the engine reports
+    // FilterTooMuch rather than hanging.
+    expect(() =>
+      hegel.test((tc) => {
         tc.draw(gs.booleans());
         tc.assume(false);
-        // Should never reach here - assume(false) always rejects
-        expect(true).toBe(false);
-      },
-      { testCases: 10 },
-    ));
+        expect(true).toBe(false); // unreachable
+      }),
+    ).toThrow(/FilterTooMuch/);
+  });
 });
 
 describe("asBasic composition", () => {

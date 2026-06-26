@@ -16,11 +16,17 @@ Hegel is a property-based testing library for TypeScript. Hegel is based on [Hyp
 
 To install: `npm install --save-dev @hegeldev/hegel`.
 
-Hegel requires Node 16+. Bun and Deno are not currently supported.
+Hegel requires Node 20.11+. Bun and Deno are not currently supported.
 
-Hegel will use [uv](https://docs.astral.sh/uv/) to install the required [hegel-core](https://github.com/hegeldev/hegel-core) server component.
-If `uv` is already on your path, it will use that, otherwise it will download a private copy of it to ~/.cache/hegel and not put it on your path.
-See https://hegel.dev/reference/installation for details.
+Hegel drives [libhegel](https://github.com/hegeldev/hegel-rust) — the native Rust
+engine — directly via FFI. The prebuilt `libhegel` shared library for every
+supported platform is bundled inside the npm package (under `native/`), so there
+is nothing to download or compile at install time — `npm install` just works
+offline. Set `HEGEL_LIBHEGEL_PATH` to point at a local build to override the
+bundled library.
+
+Supported platforms (those with a bundled libhegel artifact): Linux
+amd64/arm64, macOS arm64 (Apple Silicon), and Windows amd64/arm64.
 
 ## Quickstart
 

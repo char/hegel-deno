@@ -24,10 +24,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "native"
   ],
   "scripts": {
-    "build": "tsc && cp src/uv-install.sh dist/uv-install.sh",
+    "build": "tsc",
+    "prepack": "node scripts/fetch-libhegel.mjs --all",
     "test": "vitest run --coverage",
     "lint": "prettier --check . && eslint . && tsc --noEmit",
     "format": "prettier --write .",
@@ -41,25 +43,21 @@
   "author": "David R. MacIver <david.maciver@antithesis.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^16.18.0",
+    "@types/node": "^20.11.0",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "prettier": "^3.8.1",
-    "tsx": "^4.19.3",
     "typedoc": "^0.28.17",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "cbor-x": "^1.6.0"
-  },
-  "//overrides": "fix vitest peerOptional declaring @types/node >=20, which is incompatible with us",
-  "overrides": {
-    "@types/node": "$@types/node"
+    "cbor-x": "^1.6.0",
+    "koffi": "^3.0.2"
   }
 }

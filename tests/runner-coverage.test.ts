@@ -10,7 +10,10 @@
 import { describe, test, expect } from "vitest";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { defaultSettings } from "../src/runner.js";
+import { defaultSettings, NativeDataSource } from "../src/runner.js";
+import { Libhegel, Status, NativeVerbosity } from "../src/libhegel.js";
+import { Labels } from "../src/testCase.js";
+import { testLibPath } from "./libPath.js";
 
 describe("defaultSettings CI detection", () => {
   test("defaultSettings returns database='disabled' when CI env var is set", () => {
@@ -130,7 +133,7 @@ describe("settings branches", () => {
       { testCases: 5, database: hegel.Database.fromPath(".hegel/test-db") },
     ));
 
-  test("suppressHealthCheck passes through to server", () =>
+  test("suppressHealthCheck passes through to the engine", () =>
     hegel.test(
       (tc) => {
         tc.draw(gs.booleans());
@@ -140,13 +143,85 @@ describe("settings branches", () => {
         suppressHealthCheck: [hegel.HealthCheck.FilterTooMuch, hegel.HealthCheck.TooSlow],
       },
     ));
+
+  test("an explicit seed makes the run reproducible", () =>
+    hegel.test(
+      (tc) => {
+        tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+      },
+      { testCases: 5, seed: 42 },
+    ));
+
+  test("every verbosity level is accepted", () => {
+    for (const verbosity of [
+      hegel.Verbosity.Quiet,
+      hegel.Verbosity.Normal,
+      hegel.Verbosity.Verbose,
+      hegel.Verbosity.Debug,
+    ]) {
+      hegel.test(
+        (tc) => {
+          tc.draw(gs.booleans());
+        },
+        { testCases: 2, verbosity },
+      );
+    }
+  });
 });
 
-describe("server error detection", () => {
-  test("invalid schema triggers server error", () => {
-    // Send a schema the server rejects (integer with min > max).
-    // This exercises the generic server error path in ServerDataSource.sendRequest.
-    const badGen = new gs.BasicGenerator({ type: "integer", min_value: 100, max_value: 0 });
+describe("NativeDataSource collection rejection", () => {
+  test("rejects elements with and without a reason", () => {
+    const lib = Libhegel.load(testLibPath());
+    const ctx = lib.newContext();
+    const settings = lib.newSettings();
+    lib.setVerbosity(settings, NativeVerbosity.QUIET);
+    lib.setDatabase(ctx, settings, "");
+    const run = lib.runStart(ctx, settings);
+    try {
+      const tc = lib.nextTestCase(ctx, run);
+      expect(tc).not.toBeNull();
+      const ds = new NativeDataSource(lib, ctx, tc);
+      ds.startSpan(Labels.SET);
+      const id = ds.newCollection(2, 5);
+      const intSchema = { type: "integer", min_value: 0n, max_value: 100n };
+      let rejects = 0;
+      while (ds.collectionMore(id)) {
+        ds.startSpan(Labels.SET_ELEMENT);
+        ds.generate(intSchema);
+        ds.stopSpan(false);
+        if (rejects < 2) {
+          // First reject omits the reason (why ?? null), second supplies one.
+          ds.collectionReject(id, rejects === 0 ? undefined : "duplicate");
+          rejects++;
+        }
+      }
+      ds.stopSpan(false);
+      ds.markComplete(Status.VALID, null);
+      expect(rejects).toBe(2);
+    } finally {
+      lib.freeRun(run);
+      lib.freeSettings(settings);
+      lib.freeContext(ctx);
+    }
+  });
+});
+
+describe("non-Error failures", () => {
+  test("a thrown non-Error value is reported", () => {
+    expect(() =>
+      hegel.test((tc) => {
+        tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        throw "boom-string";
+      }),
+    ).toThrow(/Property test failed: boom-string/);
+  });
+});
+
+describe("engine error reporting", () => {
+  test("a malformed schema surfaces as a thrown error", () => {
+    // An integer schema with no bounds is rejected by the engine on the first
+    // draw; the failing draw propagates out of hegel.test.
+    const badGen = new gs.BasicGenerator({ type: "integer" });
     expect(() =>
       hegel.test(
         (tc) => {
@@ -154,72 +229,31 @@ describe("server error detection", () => {
         },
         { testCases: 1 },
       ),
-    ).toThrow("Server error");
+    ).toThrow(/Property test failed/);
   });
 
-  test("health_check_failure: excessive filtering triggers health check", () => {
-    // Filter that rejects >99% of values triggers FilterTooMuch health check.
+  test("excessive filtering trips the FilterTooMuch health check (run-level error)", () => {
+    // Rejecting >99% of values produces a FilterTooMuch health-check failure,
+    // reported by the runner as a run-level error.
     expect(() =>
-      hegel.test(
-        (tc) => {
-          const x = tc.draw(gs.integers({ minValue: 0, maxValue: 1000 }));
-          tc.assume(x === 500);
-        },
-        { testCases: 100 },
-      ),
-    ).toThrow("Health check failure");
+      hegel.test((tc) => {
+        const x = tc.draw(gs.integers({ minValue: 0, maxValue: 1000 }));
+        tc.assume(x === 500);
+      }),
+    ).toThrow(/FilterTooMuch/);
   });
 
-  test("flaky test detected", () => {
-    // A test that fails on the first run but passes on replay is flaky.
+  test("a nondeterministic (flaky) test is reported as a failure", () => {
+    // Fails the first time a positive value is seen, then passes on replay.
     let seen = false;
     expect(() =>
-      hegel.test(
-        (tc) => {
-          const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-          if (x > 0 && !seen) {
-            seen = true;
-            throw new Error("flaky failure");
-          }
-        },
-        { testCases: 100 },
-      ),
-    ).toThrow("Flaky test detected");
+      hegel.test((tc) => {
+        const x = tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
+        if (x > 0 && !seen) {
+          seen = true;
+          throw new Error("flaky failure");
+        }
+      }),
+    ).toThrow(/Property test failed/);
   });
-});
-
-describe("ServerDataSource error paths via HEGEL_PROTOCOL_TEST_MODE", () => {
-  function withTestMode(mode: string, fn: () => void) {
-    const original = process.env["HEGEL_PROTOCOL_TEST_MODE"];
-    try {
-      process.env["HEGEL_PROTOCOL_TEST_MODE"] = mode;
-      fn();
-    } finally {
-      if (original === undefined) {
-        delete process.env["HEGEL_PROTOCOL_TEST_MODE"];
-      } else {
-        process.env["HEGEL_PROTOCOL_TEST_MODE"] = original;
-      }
-    }
-  }
-
-  test("error_response exercises server error path", () =>
-    withTestMode("error_response", () =>
-      hegel.test(
-        (tc) => {
-          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-        },
-        { testCases: 10 },
-      ),
-    ));
-
-  test("stop_test_on_generate exercises StopTest path", () =>
-    withTestMode("stop_test_on_generate", () =>
-      hegel.test(
-        (tc) => {
-          tc.draw(gs.integers({ minValue: 0, maxValue: 100 }));
-        },
-        { testCases: 10 },
-      ),
-    ));
 });

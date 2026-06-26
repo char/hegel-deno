@@ -4,6 +4,8 @@
  * WTF-8 is like UTF-8 but allows encoding of surrogate codepoints
  * (U+D800-U+DFFF). Node's `Buffer.toString("utf-8")` replaces these with
  * U+FFFD, but JS strings are UTF-16 and can represent lone surrogates natively.
+ * libhegel returns generated strings as a CBOR tag-91 value wrapping WTF-8
+ * bytes (see `cbor.ts`), so this decoder is needed to recover the JS string.
  *
  * Based on the test vectors from {@link https://github.com/mathiasbynens/wtf-8}.
  *

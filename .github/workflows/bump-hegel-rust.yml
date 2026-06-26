@@ -1,0 +1,124 @@
+name: Bump hegel-rust
+
+on:
+  # Fired by hegel-rust's release workflow; client_payload.version carries the
+  # released version so we pin that exact release rather than racing on latest.
+  repository_dispatch:
+    types: [hegel-rust-release]
+  # Manual escape hatch: run with an empty version to pin the latest release,
+  # or supply a specific version.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "hegel-rust version to pin (empty = latest release)"
+        required: false
+        default: ""
+
+permissions: {}
+
+jobs:
+  bump:
+    name: bump hegel-rust
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Generate app token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        id: app-token
+        with:
+          app-id: ${{ vars.HEGEL_RELEASE_APP_ID }}
+          private-key: ${{ secrets.HEGEL_RELEASE_APP_PRIVATE_KEY }}
+          repositories: hegel-typescript
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          token: ${{ steps.app-token.outputs.token }} # zizmor: ignore[artipacked]
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Install just
+        run: sudo apt-get update && sudo apt-get install -y just
+
+      - run: npm ci
+
+      - name: Bump pinned libhegel
+        id: bump
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEGEL_RELEASE_APP_ID: ${{ vars.HEGEL_RELEASE_APP_ID }}
+          VERSION: ${{ github.event.client_payload.version || inputs.version }}
+        run: python .github/scripts/bump_hegel_rust.py "$VERSION"
+
+      # The version bump only changes the pinned constant + checksums. The C ABI
+      # may have shifted with the new release, so realign the koffi FFI wrapper
+      # (src/libhegel.ts) before the PR is reviewed. Skipped when nothing was
+      # bumped.
+      - name: Align the FFI wrapper to the new libhegel
+        if: steps.bump.outputs.bumped == 'true'
+        timeout-minutes: 30
+        uses: anthropics/claude-code-action@4d7e1f0cd85743fdc93b1c8040ab54395da024e2 # v1.0.149
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            The pinned libhegel version was just bumped to v${{ steps.bump.outputs.version }}
+            (src/checksums.ts) on this checkout. Align the TypeScript koffi FFI wrapper in
+            src/libhegel.ts to the new release's C ABI, so that `just check` passes.
+
+            The authoritative C header for the new release is
+            https://raw.githubusercontent.com/hegeldev/hegel-rust/v${{ steps.bump.outputs.version }}/hegel-c/include/hegel.h
+            — fetch it and reconcile the bound function signatures, enums, and result
+            codes in src/libhegel.ts (and, only if the ABI demands it, the thin call
+            sites in src/runner.ts / src/session.ts). Do NOT change the public
+            `@hegeldev/hegel` API (test, testAsync, Settings, generators) — only the
+            internal binding layer. Do NOT commit or push; leave all changes in the
+            working tree for the next step to commit.
+          claude_args: >-
+            --allowed-tools "Bash,Edit,Write,Read,Glob,Grep,WebFetch"
+            --max-turns 60
+
+      # Fold the FFI alignment into the bump commit so the branch carries a
+      # single bump+fix commit. No-op when alignment changed nothing.
+      - name: Amend the FFI alignment into the bump commit
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          set -euo pipefail
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No FFI alignment changes to amend."
+            exit 0
+          fi
+          git add -A
+          git commit --amend --no-edit
+
+      # The single push: force-push the reused branch and open/update the PR.
+      - name: Push and open/update the PR
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          # hegel-rust releases are public, so the app token (scoped to
+          # hegel-typescript) reads them fine; gh uses GH_TOKEN for the PR commands.
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git push --force origin "$BRANCH"
+
+          workflow_url="https://github.com/hegeldev/hegel-typescript/blob/main/.github/workflows/bump-hegel-rust.yml"
+          title="Bump pinned \`libhegel\` to \`${VERSION}\`"
+          body=$(printf '%s\n' \
+            "This PR bumps our pinned \`libhegel\` version to \`v${VERSION}\`." \
+            "" \
+            "---" \
+            "" \
+            "*This PR was automatically generated by [bump-hegel-rust.yml](${workflow_url}).*")
+
+          # Reuse the open PR for this branch if there is one; otherwise create it.
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr edit "$BRANCH" --title "$title" --body "$body"
+          else
+            gh pr create --title "$title" --body "$body"
+          fi

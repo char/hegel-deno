@@ -56,14 +56,23 @@ describe("filter combinator", () => {
       { testCases: 20 },
     ));
 
-  test("filter that always fails causes assumption rejection", () =>
+  test("filter that always fails trips the FilterTooMuch health check", () => {
+    // Every draw is rejected, so no valid case is ever produced. The engine
+    // surfaces this as a FilterTooMuch health-check failure (matching
+    // Hypothesis), which the runner reports as a thrown error.
+    expect(() =>
+      hegel.test((tc) => {
+        tc.draw(gs.integers({ minValue: 0, maxValue: 10 }).filter(() => false));
+      }),
+    ).toThrow(/FilterTooMuch/);
+  });
+
+  test("an always-failing filter is fine when the health check is suppressed", () =>
     hegel.test(
       (tc) => {
-        // This filter always fails, so all test cases become invalid
-        // The test runner treats all-invalid as passing
         tc.draw(gs.integers({ minValue: 0, maxValue: 10 }).filter(() => false));
       },
-      { testCases: 5 },
+      { suppressHealthCheck: [hegel.HealthCheck.FilterTooMuch] },
     ));
 });
 
