@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - 2026-06-26
+
+hegel-typescript now uses [libhegel](https://github.com/hegeldev/hegel-rust) — the native
+Rust engine — directly via FFI, instead of spawning the `hegel-core` Python
+server and talking to it over a socket protocol.
+
+The public API is unchanged. Two user-visible requirement changes:
+
+- Hegel no longer needs Python or `uv`.
+- Hegel now requires Node 20.11+ (the native FFI layer uses a loader that
+  depends on a recent Node).
+
 ## 0.2.3 - 2026-05-26
 
 This patch bumps our pinned hegel-core from [0.6.0](https://github.com/hegeldev/hegel-core/releases/tag/v0.6.0) to [0.9.1](https://github.com/hegeldev/hegel-core/releases/tag/v0.9.1).
