@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 - 2026-06-29
+
+This patch adds the `reportMultipleFailures` setting. When enabled, a run keeps
+generating after the first failure to surface additional *distinct* failures
+(each with a different origin); when disabled, the run stops after the first
+failing example. It defaults to `false`.
+
+```ts
+hegel.test(fn, { reportMultipleFailures: true });
+```
+
 ## 0.3.0 - 2026-06-26
 
 hegel-typescript now uses [libhegel](https://github.com/hegeldev/hegel-rust) — the native
