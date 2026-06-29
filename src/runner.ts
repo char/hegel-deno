@@ -56,6 +56,7 @@ export interface Settings {
   derandomize: boolean;
   database: Database;
   suppressHealthCheck: HealthCheck[];
+  reportMultipleFailures: boolean;
 }
 
 function isInCI(): boolean {
@@ -90,6 +91,7 @@ export function defaultSettings(): Settings {
     derandomize: inCI,
     database: inCI ? Database.disabled : Database.unset,
     suppressHealthCheck: [],
+    reportMultipleFailures: false,
   };
 }
 
@@ -320,6 +322,7 @@ function configureSettings(
   lib.setTestCases(settings, s.testCases);
   lib.setVerbosity(settings, VERBOSITY_TO_NATIVE[s.verbosity]);
   lib.setDerandomize(settings, s.derandomize);
+  lib.setReportMultipleFailures(settings, s.reportMultipleFailures);
   if (s.seed !== null) {
     lib.setSeed(settings, BigInt(s.seed));
   }

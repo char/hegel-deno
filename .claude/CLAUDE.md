@@ -20,6 +20,29 @@ bundled artifact for the host platform — no download, no cache. Set
 fetch-libhegel` downloads the host artifact into `native/` for test runs; `just
 build-libhegel` builds it from a sibling `../hegel-rust`.
 
+## Releasing / Changelog
+
+**Never edit `CHANGELOG.md` by hand.** Every pull request that modifies source
+code (`src/`) must instead include a `RELEASE.md` file at the repo root. After
+the PR merges, `.github/scripts/release.py` bumps the version in `package.json`
+and prepends the `RELEASE.md` contents to `CHANGELOG.md` automatically (the
+`check-release` CI job enforces that the file is present). `RELEASE-sample.md`
+is the worked example, and the `changelog` skill (`.claude/skills/changelog/`)
+is the style guide.
+
+A `RELEASE.md` is a `RELEASE_TYPE:` line followed by the changelog text:
+
+```
+RELEASE_TYPE: patch
+
+This patch adds <something>, because <reason>.
+```
+
+While we are on a `0.x` major version the semver levels are shifted:
+**breaking changes are `minor`; everything else — bug fixes, internal changes,
+and new non-breaking features / API additions — is `patch`.** `major` is
+reserved for 1.0 and beyond.
+
 ## What This Is
 
 A TypeScript implementation of the Hegel property-based testing library. Hegel is a

@@ -88,6 +88,7 @@ export interface Bindings {
   settingsDatabase: (ctx: Ptr, s: Ptr, db: string | null) => void;
   settingsDatabaseKey: (ctx: Ptr, s: Ptr, key: string | null) => void;
   settingsSuppressHealthCheck: (s: Ptr, checks: number) => void;
+  settingsReportMultipleFailures: (s: Ptr, yes: boolean) => void;
 
   runStart: (ctx: Ptr, settings: Ptr, out: Ptr[]) => number;
   nextTestCase: (ctx: Ptr, run: Ptr, out: Ptr[]) => number;
@@ -156,6 +157,9 @@ export function bindLibrary(lib: LibraryHandle): Bindings {
   const settingsSuppressHealthCheck = f(
     "int hegel_settings_set_suppress_health_check(void* ctx, void* s, uint32_t checks)",
   );
+  const settingsReportMultipleFailures = f(
+    "int hegel_settings_set_report_multiple_failures(void* ctx, void* s, bool yes)",
+  );
 
   const runStart = f("int hegel_run_start(void* ctx, void* settings, _Out_ void** out_run)");
   const nextTestCase = f("int hegel_next_test_case(void* ctx, void* run, _Out_ void** out_tc)");
@@ -216,6 +220,7 @@ export function bindLibrary(lib: LibraryHandle): Bindings {
     settingsDatabase: (ctx, s, db) => void settingsDatabase(ctx, s, db),
     settingsDatabaseKey: (ctx, s, key) => void settingsDatabaseKey(ctx, s, key),
     settingsSuppressHealthCheck: (s, checks) => void settingsSuppressHealthCheck(null, s, checks),
+    settingsReportMultipleFailures: (s, yes) => void settingsReportMultipleFailures(null, s, yes),
     runStart: (ctx, s, out) => runStart(ctx, s, out),
     nextTestCase: (ctx, run, out) => nextTestCase(ctx, run, out),
     runResult: (ctx, run, out) => runResult(ctx, run, out),
@@ -337,6 +342,10 @@ export class Libhegel {
 
   setSuppressHealthCheck(s: Ptr, checks: number): void {
     this.fns.settingsSuppressHealthCheck(s, checks);
+  }
+
+  setReportMultipleFailures(s: Ptr, yes: boolean): void {
+    this.fns.settingsReportMultipleFailures(s, yes);
   }
 
   /** Start a run. Throws {@link LibhegelError} on failure. */
