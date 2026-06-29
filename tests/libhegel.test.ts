@@ -33,6 +33,7 @@ function fakeBindings(overrides: Partial<Bindings>): Bindings {
     settingsDatabase: noop,
     settingsDatabaseKey: noop,
     settingsSuppressHealthCheck: noop,
+    settingsReportMultipleFailures: noop,
     runStart: (_ctx, _settings, out) => {
       out[0] = {} as Ptr;
       return 0;
@@ -241,6 +242,7 @@ describe("Libhegel wrapper logic (fake bindings)", () => {
     lib.setDatabase(null, null, "");
     lib.setDatabaseKey(null, null, "k");
     lib.setSuppressHealthCheck(null, 1);
+    lib.setReportMultipleFailures(null, true);
     lib.collectionReject(null, null, 0n, "dup");
     lib.markComplete(null, null, Status.VALID, null);
     lib.freeRun(lib.runStart(null, null));

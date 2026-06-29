@@ -96,6 +96,7 @@ describe("defaultSettings CI detection", () => {
       const settings = defaultSettings();
       expect(settings.database).toEqual(hegel.Database.unset);
       expect(settings.derandomize).toBe(false);
+      expect(settings.reportMultipleFailures).toBe(false);
     } finally {
       for (const key of allVars) {
         if (savedVars[key] === undefined) {
@@ -142,6 +143,22 @@ describe("settings branches", () => {
         testCases: 5,
         suppressHealthCheck: [hegel.HealthCheck.FilterTooMuch, hegel.HealthCheck.TooSlow],
       },
+    ));
+
+  test("reportMultipleFailures: true passes through to the engine", () =>
+    hegel.test(
+      (tc) => {
+        tc.draw(gs.booleans());
+      },
+      { testCases: 5, reportMultipleFailures: true },
+    ));
+
+  test("reportMultipleFailures: false passes through to the engine", () =>
+    hegel.test(
+      (tc) => {
+        tc.draw(gs.booleans());
+      },
+      { testCases: 5, reportMultipleFailures: false },
     ));
 
   test("an explicit seed makes the run reproducible", () =>
