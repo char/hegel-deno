@@ -187,6 +187,7 @@ export function binary(options?: BinaryOptions): Generator<Uint8Array> {
 }
 
 export interface RegexOptions {
+  /** Whether the entire string must match the pattern (default `true`). */
   fullmatch?: boolean;
 }
 
@@ -195,12 +196,16 @@ class FromRegexGenerator extends SchemaStringGenerator {
     super({
       type: "regex",
       pattern,
-      fullmatch: options?.fullmatch ?? false,
+      fullmatch: options?.fullmatch ?? true,
     });
   }
 }
 
-/** Generate strings matching a regex pattern. Defaults to substring match. */
+/**
+ * Generate strings matching a regex pattern. Defaults to full match (the
+ * entire string matches the pattern); pass `{ fullmatch: false }` for
+ * substring/contains behavior.
+ */
 export function fromRegex(pattern: string, options?: RegexOptions): Generator<string> {
   return new FromRegexGenerator(pattern, options);
 }
