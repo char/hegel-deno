@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 - 2026-07-09
+
+This release changes the default value of `fullmatch` in `fromRegex` from `false` to `true`.
+
 ## 0.3.1 - 2026-06-29
 
 This patch adds the `reportMultipleFailures` setting. When enabled, a run keeps
