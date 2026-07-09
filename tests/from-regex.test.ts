@@ -7,7 +7,16 @@ describe("gs.fromRegex()", () => {
     expect(gs.fromRegex("[0-9]+").asBasic()).not.toBeNull();
   });
 
-  test("generates strings matching the pattern", () =>
+  test("generates full matches by default", () =>
+    hegel.test(
+      (tc) => {
+        const v = tc.draw(gs.fromRegex("[0-9]{3}"));
+        expect(v).toMatch(/^[0-9]{3}$/);
+      },
+      { testCases: 50 },
+    ));
+
+  test("fullmatch=true generates full matches", () =>
     hegel.test(
       (tc) => {
         const v = tc.draw(gs.fromRegex("[0-9]{3}", { fullmatch: true }));
