@@ -7,9 +7,8 @@
  * @packageDocumentation
  */
 
-import { inspect } from "node:util";
 // Type-only import to avoid a runtime cycle: Generator depends on TestCase.
-import type { Generator } from "./generators/core.js";
+import type { Generator } from "./generators/core.ts";
 
 export class StopTestError extends Error {
   constructor() {
@@ -97,7 +96,7 @@ export class TestCase {
     if (this.spanDepth === 0) {
       this.drawCount++;
       if (this._isLastRun) {
-        console.error(`var draw_${this.drawCount} = ${inspect(value, { depth: null })};`);
+        console.error(`var draw_${this.drawCount} = ${Deno.inspect(value, { depth: Infinity })};`);
       }
     }
     return value;

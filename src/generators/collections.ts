@@ -4,8 +4,8 @@
  * @packageDocumentation
  */
 
-import { TestCase, Collection, Labels } from "../testCase.js";
-import { Generator, BasicGenerator } from "./core.js";
+import { TestCase, Collection, Labels } from "../testCase.ts";
+import { Generator, BasicGenerator } from "./core.ts";
 
 export interface CollectionOptions {
   minSize?: number;

@@ -11,8 +11,8 @@
  * @packageDocumentation
  */
 
-import { addExtension, encode, decode } from "cbor-x";
-import { wtf8ToString } from "./wtf8.js";
+import { addExtension, encode, decode } from "npm:cbor-x@1.6.0";
+import { wtf8ToString } from "./wtf8.ts";
 
 // `addExtension` mutates cbor-x's global tag registry, so registering it once
 // at module load configures every subsequent `decode` call in the process.
@@ -22,12 +22,11 @@ addExtension({
   // unreachable.
   /* v8 ignore start */
   Class: class HegelString {},
-  encode: () => Buffer.alloc(0),
+  encode: () => new Uint8Array(),
   /* v8 ignore stop */
   tag: 91,
-  // The tag-91 payload is always a CBOR byte string, which cbor-x decodes to a
-  // Buffer; `wtf8ToString` also accepts a plain Uint8Array view.
-  decode: (data: Uint8Array): string => wtf8ToString(data as Buffer),
+  // The tag-91 payload is always a CBOR byte string.
+  decode: (data: Uint8Array): string => wtf8ToString(data),
 });
 
 export { encode, decode };

@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import { TestCase, Labels, generateRaw } from "../testCase.js";
+import { TestCase, Labels, generateRaw } from "../testCase.ts";
 
 /**
  * Base class for all generators. Generators produce values of type T

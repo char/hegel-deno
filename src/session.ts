@@ -9,9 +9,9 @@
  * @packageDocumentation
  */
 
-import { Libhegel } from "./libhegel.js";
-import { locateLibhegel } from "./locate.js";
-import { LIBHEGEL_VERSION } from "./checksums.js";
+import { Libhegel } from "./libhegel.ts";
+import { locateLibhegel } from "./locate.ts";
+import { LIBHEGEL_VERSION } from "./checksums.ts";
 
 let cached: Libhegel | null = null;
 

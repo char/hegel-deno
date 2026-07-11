@@ -4,8 +4,8 @@
  * @packageDocumentation
  */
 
-import { TestCase, Labels, generateRaw } from "../testCase.js";
-import { Generator, BasicGenerator } from "./core.js";
+import { TestCase, Labels, generateRaw } from "../testCase.ts";
+import { Generator, BasicGenerator } from "./core.ts";
 
 class JustGenerator<T> extends Generator<T> {
   constructor(private readonly value: T) {

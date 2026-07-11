@@ -5,12 +5,10 @@
  * @packageDocumentation
  */
 
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { encode, decode } from "./cbor.js";
-import { TestCase, StopTestError, AssumeError, type DataSource } from "./testCase.js";
-import { getLibhegel } from "./session.js";
-import { Libhegel, Status, RunStatus, NativeVerbosity, type Ptr } from "./libhegel.js";
+import { encode, decode } from "./cbor.ts";
+import { TestCase, StopTestError, AssumeError, type DataSource } from "./testCase.ts";
+import { getLibhegel } from "./session.ts";
+import { Libhegel, Status, RunStatus, NativeVerbosity, type Ptr } from "./libhegel.ts";
 
 export enum Verbosity {
   Quiet = "quiet",
@@ -75,10 +73,8 @@ function isInCI(): boolean {
     ["bamboo.buildKey", null],
   ];
   return ciVars.some(([key, value]) => {
-    if (value === null) {
-      return process.env[key] !== undefined;
-    }
-    return process.env[key] === value;
+    const actual = Deno.env.get(key);
+    return value === null ? actual !== undefined : actual === value;
   });
 }
 
@@ -257,14 +253,14 @@ export interface TestLocation {
 
 /* v8 ignore start: only runs inside Antithesis */
 function isRunningInAntithesis(): boolean {
-  const dir = process.env["ANTITHESIS_OUTPUT_DIR"];
+  const dir = Deno.env.get("ANTITHESIS_OUTPUT_DIR");
   return dir !== undefined && dir !== "";
 }
 function emitAntithesisAssertion(location: TestLocation, passed: boolean): void {
-  const dir = process.env["ANTITHESIS_OUTPUT_DIR"];
+  const dir = Deno.env.get("ANTITHESIS_OUTPUT_DIR");
   if (!dir) return;
 
-  const filePath = path.join(dir, "sdk.jsonl");
+  const filePath = `${dir.replace(/[/\\]$/, "")}/sdk.jsonl`;
   const id = `${location.class}::${location.function} passes properties`;
 
   const locationObj = {
@@ -301,9 +297,10 @@ function emitAntithesisAssertion(location: TestLocation, passed: boolean): void 
     },
   };
 
-  fs.appendFileSync(
+  Deno.writeTextFileSync(
     filePath,
     JSON.stringify(declaration) + "\n" + JSON.stringify(evaluation) + "\n",
+    { append: true, create: true },
   );
 }
 /* v8 ignore stop */

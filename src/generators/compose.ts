@@ -4,8 +4,8 @@
  * @packageDocumentation
  */
 
-import { TestCase, Labels } from "../testCase.js";
-import { Generator, BasicGenerator } from "./core.js";
+import { TestCase, Labels } from "../testCase.ts";
+import { Generator, BasicGenerator } from "./core.ts";
 
 class ComposedGenerator<T> extends Generator<T> {
   constructor(private readonly fn: (tc: TestCase) => T) {

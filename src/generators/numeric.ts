@@ -4,8 +4,8 @@
  * @packageDocumentation
  */
 
-import { TestCase, generateRaw } from "../testCase.js";
-import { Generator, BasicGenerator } from "./core.js";
+import { TestCase, generateRaw } from "../testCase.ts";
+import { Generator, BasicGenerator } from "./core.ts";
 
 export interface IntegerOptions {
   minValue?: number;

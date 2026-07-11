@@ -223,7 +223,7 @@
  * @packageDocumentation
  */
 
-export * as generators from "./generators/index.js";
-export { TestCase } from "./testCase.js";
-export { test, testAsync, Verbosity, HealthCheck, Database } from "./runner.js";
-export type { Settings } from "./runner.js";
+export * as generators from "./generators/index.ts";
+export { TestCase } from "./testCase.ts";
+export { test, testAsync, Verbosity, HealthCheck, Database } from "./runner.ts";
+export type { Settings } from "./runner.ts";

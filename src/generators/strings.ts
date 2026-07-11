@@ -4,9 +4,9 @@
  * @packageDocumentation
  */
 
-import { TestCase, generateRaw } from "../testCase.js";
-import { Generator, BasicGenerator } from "./core.js";
-import { oneOf } from "./combinators.js";
+import { TestCase, generateRaw } from "../testCase.ts";
+import { Generator, BasicGenerator } from "./core.ts";
+import { oneOf } from "./combinators.ts";
 
 /**
  * Options for character filtering, shared between text() and characters().

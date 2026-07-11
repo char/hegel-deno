@@ -4,8 +4,8 @@
  * @packageDocumentation
  */
 
-import { TestCase, Labels } from "../testCase.js";
-import { Generator, BasicGenerator } from "./core.js";
+import { TestCase, Labels } from "../testCase.ts";
+import { Generator, BasicGenerator } from "./core.ts";
 
 class TuplesGenerator extends Generator<unknown[]> {
   private readonly generators: Generator<unknown>[];

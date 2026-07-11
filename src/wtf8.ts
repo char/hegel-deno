@@ -15,7 +15,7 @@
 /**
  * Decode a WTF-8 encoded buffer into a JS string, preserving lone surrogates.
  */
-export function wtf8ToString(buf: Buffer): string {
+export function wtf8ToString(buf: Uint8Array): string {
   const codeUnits: number[] = [];
   let i = 0;
   while (i < buf.length) {
