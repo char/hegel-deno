@@ -102,7 +102,7 @@ describe("locateLibhegel", () => {
 
   it("resolves the bundled artifact when no override is set", () => {
     delete process.env[LIBRARY_PATH_ENV];
-    // native/ is populated before the test run (just fetch-libhegel), so the
+    // native/ is populated before the test run (deno task fetch-libhegel), so the
     // host artifact resolves to a real file under the package's native dir.
     const resolved = locateLibhegel();
     expect(resolved).toBe(path.join(nativeDir(), REAL_ASSET));

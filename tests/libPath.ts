@@ -1,7 +1,7 @@
 /**
  * Resolve the libhegel path for tests. Honors `HEGEL_LIBHEGEL_PATH`; otherwise
  * falls back to the per-platform artifact bundled in the repo's `native/`
- * directory (populated by `just fetch-libhegel` / `scripts/fetch-libhegel.mjs`
+ * directory (populated by `deno task fetch-libhegel` / `scripts/fetch-libhegel.ts`
  * before the test run).
  */
 import * as fs from "node:fs";
@@ -18,7 +18,7 @@ export function testLibPath(): string {
   if (!fs.existsSync(candidate)) {
     throw new Error(
       `libhegel not found at ${candidate}. Set HEGEL_LIBHEGEL_PATH or run ` +
-        `\`just fetch-libhegel\` to download the v0.23.0 artifact into native/.`,
+        `\`deno task fetch-libhegel\` to download the v0.23.0 artifact into native/.`,
     );
   }
   return candidate;
