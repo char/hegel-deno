@@ -1,4 +1,4 @@
-import { describe, test, expect, expectTypeOf } from "vitest";
+import { describe, test, expect, expectTypeOf } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 

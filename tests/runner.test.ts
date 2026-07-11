@@ -2,10 +2,10 @@
  * Tests for the test runner, error classes, Labels, and test lifecycle.
  */
 
-import { describe, test, it, expect } from "vitest";
+import { describe, test, it, expect } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { AssumeError, Labels, StopTestError, TestCase } from "../src/testCase.js";
+import { AssumeError, Labels, StopTestError, TestCase } from "../src/testCase.ts";
 
 describe("StopTestError", () => {
   it("has correct name and message", () => {

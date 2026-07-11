@@ -5,7 +5,7 @@
  * handling via HEGEL_PROTOCOL_TEST_MODE, filter exhaustion, and error paths.
  */
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 

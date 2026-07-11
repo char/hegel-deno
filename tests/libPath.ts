@@ -6,14 +6,14 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { libhegelAssetName } from "../src/locate.js";
+import { libhegelAssetName } from "../src/locate.ts";
 
 export function testLibPath(): string {
   const override = process.env.HEGEL_LIBHEGEL_PATH;
   if (override) {
     return override;
   }
-  const asset = libhegelAssetName(process.platform, process.arch);
+  const asset = libhegelAssetName(Deno.build.os, Deno.build.arch);
   const candidate = path.join(process.cwd(), "native", asset);
   if (!fs.existsSync(candidate)) {
     throw new Error(

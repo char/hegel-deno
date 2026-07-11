@@ -9,7 +9,7 @@
  * real code, not just generator smoke tests.
  */
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 

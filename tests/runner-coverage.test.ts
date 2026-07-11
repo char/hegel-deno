@@ -7,13 +7,13 @@
  * - Server error (invalid schema) detection
  */
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { defaultSettings, NativeDataSource } from "../src/runner.js";
-import { Libhegel, Status, NativeVerbosity } from "../src/libhegel.js";
-import { Labels } from "../src/testCase.js";
-import { testLibPath } from "./libPath.js";
+import { defaultSettings, NativeDataSource } from "../src/runner.ts";
+import { Libhegel, Status, NativeVerbosity } from "../src/libhegel.ts";
+import { Labels } from "../src/testCase.ts";
+import { testLibPath } from "./libPath.ts";
 
 describe("defaultSettings CI detection", () => {
   test("defaultSettings returns database='disabled' when CI env var is set", () => {
@@ -196,7 +196,7 @@ describe("NativeDataSource collection rejection", () => {
     const run = lib.runStart(ctx, settings);
     try {
       const tc = lib.nextTestCase(ctx, run);
-      expect(tc).not.toBeNull();
+      expect(tc !== null).toBe(true);
       const ds = new NativeDataSource(lib, ctx, tc);
       ds.startSpan(Labels.SET);
       const id = ds.newCollection(2, 5);

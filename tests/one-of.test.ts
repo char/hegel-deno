@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 
@@ -12,7 +12,7 @@ describe("gs.oneOf()", () => {
   });
 
   test("accepts 2 generators", () => {
-    expect(() => gs.oneOf(gs.integers(), gs.booleans())).not.toThrow();
+    expect(() => gs.oneOf<number | boolean>(gs.integers(), gs.booleans())).not.toThrow();
   });
 
   test("generates values from one of the branches", () =>
@@ -67,7 +67,7 @@ describe("gs.oneOf()", () => {
     hegel.test(
       (tc) => {
         const filtered = gs.integers({ minValue: 0, maxValue: 10 }).filter(() => true);
-        const v = tc.draw(gs.oneOf(filtered, gs.text({ minSize: 0, maxSize: 5 })));
+        const v = tc.draw(gs.oneOf<number | string>(filtered, gs.text({ minSize: 0, maxSize: 5 })));
         expect(typeof v === "number" || typeof v === "string").toBe(true);
       },
       { testCases: 50 },
@@ -77,7 +77,7 @@ describe("gs.oneOf()", () => {
     hegel.test(
       (tc) => {
         const filtered = gs.integers({ minValue: 0, maxValue: 100 }).filter(() => true);
-        const v = tc.draw(gs.oneOf(filtered, gs.text({ minSize: 0, maxSize: 5 })));
+        const v = tc.draw(gs.oneOf<number | string>(filtered, gs.text({ minSize: 0, maxSize: 5 })));
         // Must be a number or string -- validates generator produces valid output
         expect(typeof v === "number" || typeof v === "string").toBe(true);
       },

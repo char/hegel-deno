@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { checkVersion, loadLibhegel, getLibhegel } from "../src/session.js";
-import { LIBHEGEL_VERSION } from "../src/checksums.js";
+import { describe, it, expect } from "./_deps.ts";
+import { checkVersion, loadLibhegel, getLibhegel } from "../src/session.ts";
+import { LIBHEGEL_VERSION } from "../src/checksums.ts";
 
 describe("checkVersion", () => {
   it("accepts a matching major.minor (any patch)", () => {

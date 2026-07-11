@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect } from "./_deps.ts";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 
@@ -77,8 +77,8 @@ describe("gs.bigIntegers()", () => {
     hegel.test(
       (tc) => {
         const v = tc.draw(gs.bigIntegers({ minValue: 0n, maxValue: 1000n }));
-        expect(v).toBeGreaterThanOrEqual(0n);
-        expect(v).toBeLessThanOrEqual(1000n);
+        expect(v >= 0n).toBe(true);
+        expect(v <= 1000n).toBe(true);
       },
       { testCases: 20 },
     ));
@@ -88,7 +88,7 @@ describe("gs.bigIntegers()", () => {
       (tc) => {
         const big = BigInt(Number.MAX_SAFE_INTEGER) + 1000n;
         const v = tc.draw(gs.bigIntegers({ minValue: big, maxValue: big + 1000n }));
-        expect(v).toBeGreaterThanOrEqual(big);
+        expect(v >= big).toBe(true);
       },
       { testCases: 10 },
     ));

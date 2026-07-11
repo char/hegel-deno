@@ -4,7 +4,7 @@
  * the real hegel server.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, fn, stub } from "./_deps.ts";
 import * as gs from "@hegeldev/hegel/generators";
 import {
   AssumeError,
@@ -13,8 +13,8 @@ import {
   StopTestError,
   TestCase,
   type DataSource,
-} from "../src/testCase.js";
-import { runTestCase } from "../src/runner.js";
+} from "../src/testCase.ts";
+import { runTestCase } from "../src/runner.ts";
 
 // ---------------------------------------------------------------------------
 // FakeDataSource
@@ -124,28 +124,28 @@ describe("TestCase with fake DataSource", () => {
   it("draw logs to stderr on isLastRun=true at spanDepth=0", () => {
     const ds = new FakeDataSource({ generates: [42] });
     const tc = new TestCase(ds, true);
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = fn();
+    using _ = stub(console, "error", spy as typeof console.error);
     tc.draw(gs.integers());
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("draw_1"));
-    spy.mockRestore();
   });
 
   it("note writes to stderr on isLastRun=true", () => {
     const ds = new FakeDataSource({ generates: [] });
     const tc = new TestCase(ds, true);
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = fn();
+    using _ = stub(console, "error", spy as typeof console.error);
     tc.note("hello");
     expect(spy).toHaveBeenCalledWith("hello");
-    spy.mockRestore();
   });
 
   it("note does nothing on isLastRun=false", () => {
     const ds = new FakeDataSource({ generates: [] });
     const tc = new TestCase(ds, false);
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = fn();
+    using _ = stub(console, "error", spy as typeof console.error);
     tc.note("hello");
     expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
   });
 
   it("assume(false) throws AssumeError", () => {
@@ -268,7 +268,9 @@ describe("Generator parse error paths", () => {
   it("oneOf parse throws on non-array", () => {
     const ds = new FakeDataSource({ generates: ["not array"] });
     const tc = new TestCase(ds, false);
-    expect(() => tc.draw(gs.oneOf(gs.integers(), gs.booleans()))).toThrow("Expected array");
+    expect(() => tc.draw(gs.oneOf<number | boolean>(gs.integers(), gs.booleans()))).toThrow(
+      "Expected array",
+    );
   });
 
   it("optional parse throws on non-array", () => {
@@ -290,13 +292,13 @@ describe("Generator parse error paths", () => {
 
 describe("text and characters with alphabet", () => {
   it("text with alphabet option sets schema correctly", () => {
-    const gen = gs.text({ alphabet: "abc" });
+    const gen = gs.text({ alphabet: "abc" }).asBasic()!;
     expect(gen.schema["categories"]).toEqual([]);
     expect(gen.schema["include_characters"]).toBe("abc");
   });
 
   it("characters with alphabet option sets schema correctly", () => {
-    const gen = gs.characters({ alphabet: "xyz" });
+    const gen = gs.characters({ alphabet: "xyz" }).asBasic()!;
     expect(gen.schema["categories"]).toEqual([]);
     expect(gen.schema["include_characters"]).toBe("xyz");
   });
@@ -341,7 +343,8 @@ describe("runTestCase with non-Error throws", () => {
 
   it("classifyResult uses String(e) when a non-Error is thrown in final replay", () => {
     const ds = new FakeDataSource({ generates: [42] });
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = fn();
+    using _ = stub(console, "error", spy as typeof console.error);
     const result = runTestCase(
       ds,
       () => {
@@ -351,7 +354,6 @@ describe("runTestCase with non-Error throws", () => {
     );
     expect(result.status).toBe("interesting");
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("string thrown"));
-    spy.mockRestore();
   });
 });
 
@@ -395,7 +397,9 @@ describe("optional parse paths", () => {
 
 describe("oneOf parse paths", () => {
   it("oneOf basic emits children directly with no tagged-tuple wrapping", () => {
-    const basic = gs.oneOf(gs.integers({ minValue: 0, maxValue: 10 }), gs.booleans()).asBasic();
+    const basic = gs
+      .oneOf<number | boolean>(gs.integers({ minValue: 0, maxValue: 10 }), gs.booleans())
+      .asBasic();
     expect(basic).not.toBeNull();
     expect(basic!.schema).toEqual({
       type: "one_of",
@@ -411,7 +415,7 @@ describe("oneOf parse paths", () => {
   it("oneOf dispatches by index from [index, value] response", () => {
     const ds = new FakeDataSource({ generates: [[1, true]] });
     const tc = new TestCase(ds, false);
-    const result = tc.draw(gs.oneOf(gs.integers(), gs.booleans()));
+    const result = tc.draw(gs.oneOf<number | boolean>(gs.integers(), gs.booleans()));
     expect(result).toBe(true);
   });
 

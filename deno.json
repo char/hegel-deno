@@ -10,6 +10,7 @@
     "fetch-libhegel": "deno run -A scripts/fetch-libhegel.ts",
     "format": "deno run -A npm:prettier@3.9.5 --write src scripts tests deno.json",
     "format:check": "deno run -A npm:prettier@3.9.5 --check src scripts tests deno.json",
+    "test": "deno task fetch-libhegel && deno test -A tests/",
     "update-checksums": "deno run -A scripts/update-checksums.ts"
   }
 }
